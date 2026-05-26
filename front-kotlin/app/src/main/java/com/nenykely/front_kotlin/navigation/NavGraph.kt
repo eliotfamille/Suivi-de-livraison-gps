@@ -22,6 +22,7 @@ sealed class Screen(val route: String) {
         fun createRoute(driverId: Int) = "driver_profile/$driverId"
     }
     object Profile : Screen("profile")
+    object Suivi : Screen("suivi")
 }
 
 @Composable
@@ -102,6 +103,11 @@ fun NavGraph(
                     popUpTo(0) { inclusive = true }
                 }
             })
+        }
+        composable(Screen.Suivi.route) {
+            token?.let {
+                SuiviScreen(deliveryViewModel)
+            }
         }
     }
 }

@@ -2,10 +2,13 @@ package com.nenykely.front_kotlin.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -13,7 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -23,6 +26,7 @@ import com.nenykely.front_kotlin.viewmodel.AuthViewModel
 @Composable
 fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
     val user by viewModel.user.collectAsState()
+    val primaryBlue = Color(0xFF0052CC)
 
     Scaffold(
         topBar = {
@@ -32,229 +36,178 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
                         "Logistics Pro", 
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Black, 
-                        color = MaterialTheme.colorScheme.primary
+                        color = primaryBlue
                     ) 
                 },
-                actions = {
-                    IconButton(onClick = { /* Settings */ }) {
-                        Icon(Icons.Default.Settings, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                navigationIcon = {
+                    IconButton(onClick = {}) {
+                        Icon(Icons.Default.Menu, contentDescription = null, tint = Color(0xFF1A1C1E))
                     }
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                actions = {
+                    IconButton(onClick = {}) {
+                        Surface(modifier = Modifier.size(32.dp), shape = CircleShape, color = Color(0xFFDBEAFE)) {
+                            Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.padding(4.dp), tint = Color(0xFF3B82F6))
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.White)
             )
         }
     ) { padding ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(MaterialTheme.colorScheme.background)
-                .padding(horizontal = 16.dp),
+                .background(Color(0xFFF8F9FE))
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            item {
-                Spacer(modifier = Modifier.height(24.dp))
-                // Hero Section / Identity
-                Box(contentAlignment = Alignment.BottomEnd) {
-                    Surface(
-                        modifier = Modifier.size(96.dp),
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        border = androidx.compose.foundation.BorderStroke(4.dp, MaterialTheme.colorScheme.surfaceContainerHighest)
-                    ) {
-                        Icon(
-                            Icons.Default.Person, 
-                            contentDescription = null, 
-                            modifier = Modifier.padding(16.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Surface(
-                        modifier = Modifier.size(28.dp),
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primary,
-                        shadowElevation = 4.dp
-                    ) {
-                        IconButton(onClick = { /* Edit */ }) {
-                            Icon(Icons.Default.Edit, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
-                        }
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Text(
-                    text = user?.name ?: "Utilisateur",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = if (user?.roles?.contains("client") == true) "Client Premium" else "Collaborateur",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                
-                Spacer(modifier = Modifier.height(32.dp))
-            }
-
-            item {
-                SectionHeader("Informations Personnelles")
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+            // Profile Header
+            Box(contentAlignment = Alignment.BottomEnd) {
+                Surface(
+                    modifier = Modifier.size(100.dp),
+                    shape = CircleShape,
+                    color = Color(0xFFE2E8F0)
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        InfoRow(Icons.Default.Mail, "Email", user?.email ?: "...")
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
-                        InfoRow(Icons.Default.Call, "Téléphone", user?.phone ?: "+33 6 12 34 56 78")
-                    }
+                    Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.padding(20.dp), tint = Color(0xFF94A3B8))
                 }
-                Spacer(modifier = Modifier.height(24.dp))
-            }
-
-            item {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    SectionHeader("Adresses Enregistrées")
-                    TextButton(onClick = { /* Add */ }) {
-                        Text("Ajouter", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                    }
-                }
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                Surface(
+                    modifier = Modifier.size(28.dp),
+                    shape = CircleShape,
+                    color = primaryBlue,
+                    border = androidx.compose.foundation.BorderStroke(2.dp, Color.White)
                 ) {
-                    Column {
-                        AddressRow(Icons.Default.Home, "Domicile", "123 Rue de la Paix, 75002 Paris")
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
-                        AddressRow(Icons.Default.Work, "Bureau", "45 Avenue des Champs-Élysées, 75008 Paris")
-                    }
+                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.padding(6.dp), tint = Color.White)
                 }
-                Spacer(modifier = Modifier.height(24.dp))
             }
-
-            item {
-                SectionHeader("Préférences")
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        PreferenceRow("Notifications Push", true)
-                        PreferenceRow("Emails de suivi", false)
-                        PreferenceRow("Mode Sombre", false)
-                    }
-                }
-                Spacer(modifier = Modifier.height(32.dp))
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(user?.name ?: "Jean Dupont", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("Client Premium", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF64748B))
+            
+            Spacer(modifier = Modifier.height(32.dp))
+            
+            // Sections
+            ProfileSection(title = "INFORMATIONS PERSONNELLES") {
+                ProfileItem(icon = Icons.Default.Email, label = "Email", value = user?.email ?: "jean.dupont@email.com")
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color(0xFFF1F5F9))
+                ProfileItem(icon = Icons.Default.Phone, label = "Téléphone", value = user?.phone ?: "+33 6 12 34 56 78")
             }
-
-            item {
-                OutlinedButton(
-                    onClick = { 
-                        viewModel.logout()
-                        onLogout()
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    border = androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.2f)),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Logout, contentDescription = null, modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Déconnexion", style = MaterialTheme.typography.titleMedium)
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    "Version 2.4.0 (Build 108)", 
-                    style = MaterialTheme.typography.labelSmall, 
-                    color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.padding(bottom = 24.dp)
-                )
+            
+            ProfileSection(title = "ADRESSES ENREGISTRÉES", actionText = "Ajouter") {
+                AddressItem(icon = Icons.Default.Home, label = "Domicile", address = "123 Rue de la Paix, 75002 Paris")
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color(0xFFF1F5F9))
+                AddressItem(icon = Icons.Default.Work, label = "Bureau", address = "45 Avenue des Champs-Élysées, 75008 Paris")
             }
+            
+            ProfileSection(title = "PRÉFÉRENCES") {
+                PreferenceItem(icon = Icons.Default.Notifications, label = "Notifications Push", isChecked = true)
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color(0xFFF1F5F9))
+                PreferenceItem(icon = Icons.Default.AlternateEmail, label = "Emails de suivi", isChecked = false)
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color(0xFFF1F5F9))
+                PreferenceItem(icon = Icons.Default.DarkMode, label = "Mode Sombre", isChecked = false)
+            }
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            OutlinedButton(
+                onClick = { 
+                    viewModel.logout()
+                    onLogout()
+                },
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFCA5A5)),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF4444))
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Déconnexion", fontWeight = FontWeight.Bold)
+            }
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            Text("Version 2.4.0 (Build 108)", style = MaterialTheme.typography.labelSmall, color = Color(0xFF94A3B8))
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }
 
 @Composable
-fun SectionHeader(text: String) {
-    Text(
-        text = text.uppercase(),
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        letterSpacing = 1.sp,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp)
-    )
+fun ProfileSection(title: String, actionText: String? = null, content: @Composable ColumnScope.() -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(title, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color(0xFF64748B), letterSpacing = 0.5.sp)
+            if (actionText != null) {
+                TextButton(onClick = {}) {
+                    Text(actionText, color = Color(0xFF2563EB), fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0))
+        ) {
+            Column(content = content)
+        }
+    }
 }
 
 @Composable
-fun InfoRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Surface(
-            modifier = Modifier.size(40.dp),
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            shape = RoundedCornerShape(8.dp)
-        ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.padding(8.dp), tint = MaterialTheme.colorScheme.primary)
+fun ProfileItem(icon: ImageVector, label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(modifier = Modifier.size(40.dp), shape = RoundedCornerShape(8.dp), color = Color(0xFFEFF6FF)) {
+            Icon(icon, contentDescription = null, modifier = Modifier.padding(8.dp), tint = Color(0xFF3B82F6))
         }
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(value, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = Color(0xFF64748B))
+            Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
         }
-        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.outline, modifier = Modifier.size(20.dp))
+        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = Color(0xFFCBD5E1), modifier = Modifier.size(20.dp))
     }
 }
 
 @Composable
-fun AddressRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, address: String) {
-    Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-        Surface(
-            modifier = Modifier.size(40.dp),
-            color = if (label == "Domicile") MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceContainer,
-            shape = RoundedCornerShape(8.dp)
-        ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.padding(8.dp), tint = if (label == "Domicile") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary)
+fun AddressItem(icon: ImageVector, label: String, address: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(modifier = Modifier.size(40.dp), shape = RoundedCornerShape(8.dp), color = Color(0xFFF1F5F9)) {
+            Icon(icon, contentDescription = null, modifier = Modifier.padding(8.dp), tint = Color(0xFF3B82F6))
         }
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-            Text(address, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
+            Text(address, style = MaterialTheme.typography.bodyMedium, color = Color(0xFF64748B))
         }
-        Icon(Icons.Default.MoreVert, contentDescription = null, tint = MaterialTheme.colorScheme.outline, modifier = Modifier.size(20.dp))
+        Icon(Icons.Default.MoreVert, contentDescription = null, tint = Color(0xFF94A3B8))
     }
 }
 
 @Composable
-fun PreferenceRow(label: String, checked: Boolean) {
-    var isChecked by remember { mutableStateOf(checked) }
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            val icon = when(label) {
-                "Notifications Push" -> Icons.Default.Notifications
-                "Emails de suivi" -> Icons.Default.AlternateEmail
-                else -> Icons.Default.DarkMode
-            }
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
-            Spacer(modifier = Modifier.width(16.dp))
-            Text(label, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-        }
+fun PreferenceItem(icon: ImageVector, label: String, isChecked: Boolean) {
+    var checked by remember { mutableStateOf(isChecked) }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = Color(0xFF1E293B), modifier = Modifier.size(24.dp))
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = Color(0xFF1E293B))
         Switch(
-            checked = isChecked, 
-            onCheckedChange = { isChecked = it },
-            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = MaterialTheme.colorScheme.primary)
+            checked = checked,
+            onCheckedChange = { checked = it },
+            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Color(0xFF2563EB))
         )
     }
 }
