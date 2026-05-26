@@ -1,0 +1,183 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Controllers\Controller;
+use App\Models\Delivery;
+use App\Models\Driver;
+use App\Models\Order;
+use App\Models\User;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Contracts\View\View;
+
+class AdminController extends Controller
+{
+    /**
+     * GET /api/admin/dashboard — Stats générales
+     */
+    public function webDashboard(): View
+    {
+        // 1. Stats globales adaptées aux clés de dashboard.blade.php
+        $stats = [
+            'total_deliveries' => Delivery::count(),
+            'today_count'      => Delivery::whereDate('created_at', today())->count(),
+            'delivered'        => Delivery::where('status', 'delivered')->count(),
+            'in_progress'      => Delivery::whereIn('status', ['assigned', 'picked_up', 'in_transit'])->count(),
+            'revenue'          => Order::sum('delivery_fee'),
+        ];
+
+        // 2. Livraisons récentes (on laisse les objets Eloquent intacts pour le Blade)
+        $recentDeliveries = Delivery::with(['order.client', 'driver.user'])
+            ->latest()
+            ->take(10)
+            ->get();
+
+        // 3. Liste complète des livreurs
+        $drivers = Driver::with('user')->get();
+        // 4. LIVREURS ACTIFS (Requis pour la carte interactive du Blade !)
+        $activeDrivers = Driver::with('user')
+            ->where('status', 'busy')
+            ->whereNotNull('current_lat')
+            ->get();
+        // 5. Stats spécifiques aux livreurs pour le graphique Donut
+        $driverStats = [
+            'total'     => Driver::count(),
+            'available' => Driver::where('status', 'available')->count(),
+            'busy'      => Driver::where('status', 'busy')->count(),
+            'offline'   => Driver::where('status', 'offline')->count(),
+        ];
+
+        return view('dashboard', compact('stats', 'recentDeliveries', 'drivers', 'activeDrivers', 'driverStats'));
+    }
+    public function dashboard(Request $request): JsonResponse
+    {
+        $stats = [
+            'deliveries' => [
+                'total'      => Delivery::count(),
+                'pending'    => Delivery::where('status', 'pending')->count(),
+                'in_transit' => Delivery::where('status', 'in_transit')->count(),
+                'delivered'  => Delivery::where('status', 'delivered')->count(),
+                'failed'     => Delivery::where('status', 'failed')->count(),
+                'today'      => Delivery::whereDate('created_at', today())->count(),
+                'this_week'  => Delivery::whereBetween('created_at', [now()->startOfWeek(), now()])->count(),
+            ],
+            'drivers' => [
+                'total'     => Driver::count(),
+                'available' => Driver::where('status', 'available')->count(),
+                'busy'      => Driver::where('status', 'busy')->count(),
+                'offline'   => Driver::where('status', 'offline')->count(),
+            ],
+            'clients' => [
+                'total' => User::role('client')->count(),
+                'new_this_month' => User::role('client')
+                    ->whereMonth('created_at', now()->month)
+                    ->count(),
+            ],
+            'revenue' => [
+                'total'      => Order::sum('delivery_fee'),
+                'this_month' => Order::whereMonth('created_at', now()->month)->sum('delivery_fee'),
+                'today'      => Order::whereDate('created_at', today())->sum('delivery_fee'),
+            ],
+        ];
+
+        // Livraisons récentes
+        $recentDeliveries = Delivery::with(['order.client', 'driver.user'])
+            ->latest()
+            ->take(10)
+            ->get()
+            ->map(fn($d) => [
+                'id'           => $d->id,
+                'order_number' => $d->order->order_number,
+                'status'       => $d->status,
+                'status_label' => $d->status_label,
+                'client'       => $d->order->client->name,
+                'driver'       => $d->driver?->user?->name ?? 'Non assigné',
+                'created_at'   => $d->created_at,
+            ]);
+
+        // Livreurs actifs avec leur position
+        $activeDrivers = Driver::with('user')
+            ->where('status', 'busy')
+            ->whereNotNull('current_lat')
+            ->get()
+            ->map(fn($d) => [
+                'id'            => $d->id,
+                'name'          => $d->user->name,
+                'vehicle_type'  => $d->vehicle_type,
+                'vehicle_plate' => $d->vehicle_plate,
+                'lat'           => $d->current_lat,
+                'lng'           => $d->current_lng,
+                'last_seen'     => $d->last_location_at,
+                'rating'        => $d->rating,
+            ]);
+
+        
+        return response()->json([
+            'stats'             => $stats,
+            'recent_deliveries' => $recentDeliveries,
+            'active_drivers'    => $activeDrivers,
+        ]);
+}
+    /**
+     * GET /api/admin/drivers — Liste livreurs
+     */
+    public function drivers(Request $request): JsonResponse
+    {
+        $drivers = Driver::with('user')
+            ->when($request->status, fn($q, $s) => $q->where('status', $s))
+            ->paginate(20);
+
+        return response()->json([
+            'data' => $drivers->map(fn($d) => [
+                'id'                => $d->id,
+                'name'              => $d->user->name,
+                'email'             => $d->user->email,
+                'phone'             => $d->user->phone,
+                'status'            => $d->status,
+                'vehicle_type'      => $d->vehicle_type,
+                'vehicle_plate'     => $d->vehicle_plate,
+                'vehicle_model'     => $d->vehicle_model,
+                'rating'            => $d->rating,
+                'total_deliveries'  => $d->total_deliveries,
+                'current_lat'       => $d->current_lat,
+                'current_lng'       => $d->current_lng,
+                'last_location_at'  => $d->last_location_at,
+            ]),
+            'meta' => [
+                'total'        => $drivers->total(),
+                'current_page' => $drivers->currentPage(),
+                'last_page'    => $drivers->lastPage(),
+            ],
+        ]);
+    }
+
+    /**
+     * POST /api/admin/deliveries/{id}/assign — Assigner un livreur
+     */
+    public function assignDriver(Request $request, Delivery $delivery): JsonResponse
+    {
+        $data = $request->validate([
+            'driver_id' => 'required|exists:drivers,id',
+        ]);
+
+        $driver = Driver::findOrFail($data['driver_id']);
+
+        if ($driver->status === 'offline') {
+            return response()->json(['message' => 'Ce livreur est hors ligne'], 422);
+        }
+
+        $delivery->update([
+            'driver_id'   => $driver->id,
+            'status'      => 'assigned',
+            'assigned_at' => now(),
+        ]);
+
+        $delivery->changeStatus('assigned', "Assigné à {$driver->user->name}");
+        $driver->update(['status' => 'busy']);
+
+        return response()->json([
+            'message' => "Livraison assignée à {$driver->user->name}",
+        ]);
+    }
+}
