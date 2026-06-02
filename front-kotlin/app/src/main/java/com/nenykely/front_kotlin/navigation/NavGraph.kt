@@ -6,7 +6,9 @@ import androidx.compose.runtime.getValue
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import com.nenykely.front_kotlin.ui.screens.*
+import com.nenykely.front_kotlin.ui.screens.client.*
+import com.nenykely.front_kotlin.ui.screens.driver.*
+import com.nenykely.front_kotlin.ui.screens.common.*
 import com.nenykely.front_kotlin.viewmodel.AuthViewModel
 import com.nenykely.front_kotlin.viewmodel.DeliveryViewModel
 
@@ -20,6 +22,12 @@ sealed class Screen(val route: String) {
     }
     object DriverProfile : Screen("driver_profile/{driverId}") {
         fun createRoute(driverId: Int) = "driver_profile/$driverId"
+    }
+    object DriverMission : Screen("driver_mission/{deliveryId}") {
+        fun createRoute(deliveryId: Int) = "driver_mission/$deliveryId"
+    }
+    object Signature : Screen("signature/{deliveryId}") {
+        fun createRoute(deliveryId: Int) = "signature/$deliveryId"
     }
     object Profile : Screen("profile")
     object Suivi : Screen("suivi")
@@ -38,11 +46,19 @@ fun NavGraph(
         startDestination = Screen.Login.route
     ) {
         composable(Screen.Login.route) {
+            val userState by authViewModel.user.collectAsState()
             LoginScreen(
                 viewModel = authViewModel,
                 onLoginSuccess = {
-                    navController.navigate(Screen.Home.route) {
-                        popUpTo(Screen.Login.route) { inclusive = true }
+                    val user = authViewModel.user.value
+                    if (user?.isDriver() == true) {
+                        navController.navigate(Screen.Deliveries.route) {
+                            popUpTo(Screen.Login.route) { inclusive = true }
+                        }
+                    } else {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(Screen.Login.route) { inclusive = true }
+                        }
                     }
                 },
                 onNavigateToRegister = {
@@ -51,11 +67,19 @@ fun NavGraph(
             )
         }
         composable(Screen.Register.route) {
+            val userState by authViewModel.user.collectAsState()
             RegisterScreen(
                 viewModel = authViewModel,
                 onRegisterSuccess = {
-                    navController.navigate(Screen.Home.route) {
-                        popUpTo(Screen.Login.route) { inclusive = true }
+                    val user = authViewModel.user.value
+                    if (user?.isDriver() == true) {
+                        navController.navigate(Screen.Deliveries.route) {
+                            popUpTo(Screen.Login.route) { inclusive = true }
+                        }
+                    } else {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(Screen.Login.route) { inclusive = true }
+                        }
                     }
                 },
                 onBackToLogin = {
@@ -69,10 +93,17 @@ fun NavGraph(
             })
         }
         composable(Screen.Deliveries.route) {
+            val user by authViewModel.user.collectAsState()
             token?.let { t ->
-                DeliveriesScreen(t, deliveryViewModel, onDeliveryClick = { id ->
-                    navController.navigate(Screen.Tracking.createRoute(id))
-                })
+                if (user?.isDriver() == true) {
+                    DriverDeliveriesScreen(t, deliveryViewModel, onDeliveryClick = { id ->
+                        navController.navigate(Screen.DriverMission.createRoute(id))
+                    })
+                } else {
+                    ClientDeliveriesScreen(t, user, deliveryViewModel, onDeliveryClick = { id ->
+                        navController.navigate(Screen.Tracking.createRoute(id))
+                    })
+                }
             }
         }
         composable(Screen.Tracking.route) { backStackEntry ->
@@ -84,6 +115,35 @@ fun NavGraph(
                     }, onNavigateToDriver = { driverId ->
                         navController.navigate(Screen.DriverProfile.createRoute(driverId))
                     })
+                }
+            }
+        }
+        composable(Screen.DriverMission.route) { backStackEntry ->
+            val deliveryId = backStackEntry.arguments?.getString("deliveryId")?.toIntOrNull()
+            token?.let { t ->
+                deliveryId?.let { id ->
+                    DriverMissionScreen(t, id, deliveryViewModel, onBack = {
+                        navController.popBackStack()
+                    }, onSignature = {
+                        navController.navigate(Screen.Signature.createRoute(id))
+                    })
+                }
+            }
+        }
+        composable(Screen.Signature.route) { backStackEntry ->
+            val deliveryId = backStackEntry.arguments?.getString("deliveryId")?.toIntOrNull()
+            token?.let { t ->
+                deliveryId?.let { id ->
+                    SignatureScreen(
+                        onSignatureCaptured = { _ ->
+                            deliveryViewModel.updateStatus(t, id, "delivered") {
+                                navController.navigate(Screen.Deliveries.route) {
+                                    popUpTo(Screen.Deliveries.route) { inclusive = true }
+                                }
+                            }
+                        },
+                        onBack = { navController.popBackStack() }
+                    )
                 }
             }
         }
@@ -106,7 +166,7 @@ fun NavGraph(
         }
         composable(Screen.Suivi.route) {
             token?.let {
-                SuiviScreen(deliveryViewModel)
+                SuiviScreen(it, deliveryViewModel)
             }
         }
     }

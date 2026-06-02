@@ -32,6 +32,7 @@ class AuthViewModel(private val repository: DeliveryRepository = DeliveryReposit
                     val authResponse = response.body()
                     _user.value = authResponse?.user
                     _token.value = authResponse?.token
+                    android.util.Log.d("AuthViewModel", "User logged in: ${authResponse?.user?.name}, roles: ${authResponse?.user?.roles}")
                     onSuccess()
                 } else {
                     val errorBody = response.errorBody()?.string()
@@ -50,7 +51,29 @@ class AuthViewModel(private val repository: DeliveryRepository = DeliveryReposit
         _token.value = null
     }
 
-    fun register(name: String, email: String, password: String, phone: String?, onSuccess: () -> Unit) {
+    fun updateProfile(domicile: String?, bureau: String?) {
+        val currentToken = _token.value ?: return
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val response = repository.updateProfile(
+                    currentToken,
+                    mapOf("domicile" to domicile, "bureau" to bureau)
+                )
+                if (response.isSuccessful) {
+                    _user.value = response.body()
+                } else {
+                    _error.value = "Update failed: ${response.code()}"
+                }
+            } catch (e: Exception) {
+                _error.value = e.message
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun register(name: String, email: String, password: String, phone: String?, role: String = "client", onSuccess: () -> Unit) {
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
@@ -61,13 +84,15 @@ class AuthViewModel(private val repository: DeliveryRepository = DeliveryReposit
                         email = email,
                         password = password,
                         password_confirmation = password,
-                        phone = if (phone.isNullOrBlank()) null else phone
+                        phone = if (phone.isNullOrBlank()) null else phone,
+                        role = role
                     )
                 )
                 if (response.isSuccessful) {
                     val authResponse = response.body()
                     _user.value = authResponse?.user
                     _token.value = authResponse?.token
+                    android.util.Log.d("AuthViewModel", "User logged in: ${authResponse?.user?.name}, roles: ${authResponse?.user?.roles}")
                     onSuccess()
                 } else {
                     val errorBody = response.errorBody()?.string()

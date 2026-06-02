@@ -81,4 +81,45 @@ class Delivery extends Model
     {
         return self::STATUS_LABELS[$this->status] ?? $this->status;
     }
+
+    /**
+     * Calculer l'ETA basé sur la distance entre le livreur et le destinataire.
+     */
+    public function calculateETA(): ?int
+    {
+        if (!$this->driver || !$this->driver->current_lat || !$this->order->recipient_lat) {
+            return null;
+        }
+
+        $distance = $this->haversineDistance(
+            $this->driver->current_lat,
+            $this->driver->current_lng,
+            $this->order->recipient_lat,
+            $this->order->recipient_lng
+        );
+
+        // Vitesse moyenne estimée : 20 km/h en ville
+        $speedKmH = 20;
+        $timeHours = $distance / $speedKmH;
+        $timeMinutes = round($timeHours * 60);
+
+        // Ajouter un tampon de 5 minutes
+        $eta = $timeMinutes + 5;
+
+        $this->update(['estimated_arrival' => now()->addMinutes($eta)]);
+
+        return $eta;
+    }
+
+    private function haversineDistance($lat1, $lon1, $lat2, $lon2)
+    {
+        $earthRadius = 6371; // km
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLon = deg2rad($lon2 - $lon1);
+        $a = sin($dLat / 2) * sin($dLat / 2) +
+             cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
+             sin($dLon / 2) * sin($dLon / 2);
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+        return $earthRadius * $c;
+    }
 }

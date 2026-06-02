@@ -6,7 +6,30 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 object RetrofitClient {
-    private const val BASE_URL = "http://10.0.2.2:8000/" // Default for Android emulator to access localhost
+    // Modify PHYSICAL_IP to match your computer's local IP address
+    private const val PHYSICAL_IP = "192.168.1.241"
+    private const val EMULATOR_IP = "10.0.2.2"
+    private const val PORT = "8000"
+
+    private val BASE_URL: String by lazy {
+        val ip = if (isEmulator()) EMULATOR_IP else PHYSICAL_IP
+        "http://$ip:$PORT/"
+    }
+
+    private fun isEmulator(): Boolean {
+        return (android.os.Build.BRAND.startsWith("generic") ||
+                android.os.Build.DEVICE.startsWith("generic") ||
+                android.os.Build.MODEL.contains("google_sdk") ||
+                android.os.Build.MODEL.contains("Emulator") ||
+                android.os.Build.MODEL.contains("Android SDK built for x86") ||
+                android.os.Build.PRODUCT.contains("sdk_google") ||
+                android.os.Build.PRODUCT.contains("google_sdk") ||
+                android.os.Build.PRODUCT.contains("sdk") ||
+                android.os.Build.PRODUCT.contains("sdk_x86") ||
+                android.os.Build.PRODUCT.contains("vbox86p") ||
+                android.os.Build.PRODUCT.contains("emulator") ||
+                android.os.Build.PRODUCT.contains("simulator"))
+    }
 
     private val logging = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY

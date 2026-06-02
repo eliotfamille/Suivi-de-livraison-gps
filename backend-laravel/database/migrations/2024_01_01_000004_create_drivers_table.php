@@ -8,12 +8,14 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // BLOC REPOUSSÉ DANS LA MIGRATION USERS -> SUPPRIMÉ D'ICI
+
         Schema::create('drivers', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->unique()->constrained('users')->cascadeOnDelete();
-            $table->string('license_number')->unique();
-            $table->string('vehicle_type'); // moto, voiture, camion
-            $table->string('vehicle_plate');
+            $table->string('license_number')->unique()->nullable();
+            $table->string('vehicle_type')->nullable(); // moto, voiture, camion
+            $table->string('vehicle_plate')->nullable();
             $table->string('vehicle_model')->nullable();
             $table->enum('status', ['available', 'busy', 'offline'])->default('offline');
             $table->decimal('current_lat', 10, 7)->nullable();

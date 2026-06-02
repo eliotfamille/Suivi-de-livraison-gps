@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,7 +32,8 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.nenykely.front_kotlin.navigation.NavGraph
-import com.nenykely.front_kotlin.navigation.Screen
+import com.nenykely.front_kotlin.navigation.*
+import com.nenykely.front_kotlin.ui.screens.common.*
 import com.nenykely.front_kotlin.ui.theme.FrontkotlinTheme
 import com.nenykely.front_kotlin.viewmodel.AuthViewModel
 import com.nenykely.front_kotlin.viewmodel.DeliveryViewModel
@@ -48,6 +50,8 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentDestination = navBackStackEntry?.destination
+                val user by authViewModel.user.collectAsState()
+                val isDriver = user?.isDriver() == true
 
                 Scaffold(
                     bottomBar = {
@@ -62,18 +66,20 @@ class MainActivity : ComponentActivity() {
                                     horizontalArrangement = Arrangement.SpaceAround,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    NavigationItem(
-                                        label = "Accueil",
-                                        icon = Icons.Default.Home,
-                                        selected = currentDestination?.hierarchy?.any { it.route == Screen.Home.route } == true,
-                                        onClick = {
-                                            navController.navigate(Screen.Home.route) {
-                                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                                launchSingleTop = true
-                                                restoreState = true
+                                    if (!isDriver) {
+                                        NavigationItem(
+                                            label = "Accueil",
+                                            icon = Icons.Default.Home,
+                                            selected = currentDestination?.hierarchy?.any { it.route == Screen.Home.route } == true,
+                                            onClick = {
+                                                navController.navigate(Screen.Home.route) {
+                                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                                    launchSingleTop = true
+                                                    restoreState = true
+                                                }
                                             }
-                                        }
-                                    )
+                                        )
+                                    }
                                     NavigationItem(
                                         label = "Livraisons",
                                         icon = Icons.Default.Inventory2,
@@ -86,18 +92,34 @@ class MainActivity : ComponentActivity() {
                                             }
                                         }
                                     )
-                                    NavigationItem(
-                                        label = "Suivi",
-                                        icon = Icons.Default.Map,
-                                        selected = currentDestination?.hierarchy?.any { it.route == Screen.Suivi.route } == true,
-                                        onClick = {
-                                            navController.navigate(Screen.Suivi.route) {
-                                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                                launchSingleTop = true
-                                                restoreState = true
+                                    if (isDriver) {
+                                        NavigationItem(
+                                            label = "Carte",
+                                            icon = Icons.Default.Map,
+                                            selected = currentDestination?.hierarchy?.any { it.route == Screen.Suivi.route } == true,
+                                            onClick = {
+                                                navController.navigate(Screen.Suivi.route) {
+                                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                                    launchSingleTop = true
+                                                    restoreState = true
+                                                }
                                             }
-                                        }
-                                    )
+                                        )
+                                    }
+                                    if (!isDriver) {
+                                        NavigationItem(
+                                            label = "Suivi",
+                                            icon = Icons.Default.Map,
+                                            selected = currentDestination?.hierarchy?.any { it.route == Screen.Suivi.route } == true,
+                                            onClick = {
+                                                navController.navigate(Screen.Suivi.route) {
+                                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                                    launchSingleTop = true
+                                                    restoreState = true
+                                                }
+                                            }
+                                        )
+                                    }
                                     NavigationItem(
                                         label = "Profil",
                                         icon = Icons.Default.Person,

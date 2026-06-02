@@ -37,6 +37,11 @@ android {
     buildFeatures {
         compose = true
     }
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
 }
 
 dependencies {
@@ -60,8 +65,7 @@ dependencies {
     implementation(libs.navigation.compose)
 
     // Maps
-    implementation(libs.maps.compose)
-    implementation(libs.play.services.maps)
+    implementation(libs.osmdroid)
     implementation(libs.play.services.location)
     implementation(libs.accompanist.permissions)
     testImplementation(libs.junit)

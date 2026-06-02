@@ -18,10 +18,31 @@ class AuthController extends Controller
             'email'    => 'required|email|unique:users',
             'phone'    => 'nullable|string|max:20',
             'password' => 'required|min:8|confirmed',
+            'role'     => 'nullable|string|in:client,driver'
         ]);
 
-        $user = User::create($data);
-        $user->assignRole('client'); // rôle par défaut
+        $role = $request->role ?? 'client';
+
+        $user = \DB::transaction(function () use ($data, $role) {
+            $user = User::create([
+                'name'     => $data['name'],
+                'email'    => $data['email'],
+                'phone'    => $data['phone'] ?? null,
+                'password' => $data['password'],
+            ]);
+
+            $user->assignRole($role);
+
+            // Si c'est un livreur, on crée son profil Driver
+            if ($role === 'driver') {
+                $user->driver()->create([
+                    'status' => 'available',
+                    'vehicle_type' => 'motorcycle', // Valeur par défaut
+                ]);
+            }
+
+            return $user;
+        });
 
         $token = $user->createToken('mobile-app')->plainTextToken;
 

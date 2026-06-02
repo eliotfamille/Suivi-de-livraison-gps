@@ -9,6 +9,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
     <style>
         :root {
@@ -642,32 +643,7 @@
 
                 <div style="padding:16px">
 
-                    <div class="map-container">
-
-                        <div class="map-grid"></div>
-
-                        @foreach($activeDrivers as $index => $driver)
-
-                            <div class="driver-dot"
-                                 style="
-                                    top: {{ 20 + ($index * 15) }}%;
-                                    left: {{ 30 + ($index * 10) }}%;
-                                 ">
-                            </div>
-
-                        @endforeach
-
-                        <div style="
-                            position:absolute;
-                            bottom:20px;
-                            left:20px;
-                            z-index:2;
-                            font-size:12px;
-                        ">
-                            Antananarivo
-                        </div>
-
-                    </div>
+                    <div id="map" style="height: 280px; border-radius: 8px;"></div>
 
                 </div>
 
@@ -758,6 +734,50 @@
     </main>
 
 </div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+<script>
+    // Initialisation de la carte
+    var map = L.map('map').setView([-18.8792, 47.5079], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    var markers = {};
+
+    // Ajouter les livreurs déjà actifs
+    @foreach($activeDrivers as $driver)
+        @if($driver->current_lat && $driver->current_lng)
+            markers[{{ $driver->id }}] = L.marker([{{ $driver->current_lat }}, {{ $driver->current_lng }}])
+                .addTo(map)
+                .bindPopup('{{ $driver->user->name }}');
+        @endif
+    @endforeach
+
+    // Configuration Pusher (si configuré)
+    var pusher = new Pusher('{{ env('PUSHER_APP_KEY') }}', {
+        cluster: '{{ env('PUSHER_APP_CLUSTER') }}'
+    });
+
+    var channel = pusher.subscribe('driver-locations');
+    channel.bind('App\\Events\\DriverLocationUpdated', function(data) {
+        if (markers[data.driver_id]) {
+            markers[data.driver_id].setLatLng([data.lat, data.lng]);
+        } else {
+            markers[data.driver_id] = L.marker([data.lat, data.lng])
+                .addTo(map)
+                .bindPopup('Livreur #' + data.driver_id);
+        }
+    });
+
+    // Recharger la page si statut livraison change
+    var statusChannel = pusher.subscribe('admin-deliveries');
+    statusChannel.bind('App\\Events\\DeliveryStatusUpdated', function(data) {
+        // Optionnel: Recharger discrètement ou notifier
+        console.log('Livraison mise à jour:', data);
+    });
+</script>
 
 </body>
 </html>

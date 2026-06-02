@@ -11,37 +11,34 @@ Route::prefix('auth')->group(function () {
     Route::post('/login',    [AuthController::class, 'login'])->name('login');
 });
 
-// Tracage
+// Traçage public sécurisé
 Route::get('/tracking/{identifier}', [DeliveryController::class, 'tracking']);
 
-// Authentification
+// Authentification requise
 Route::middleware('auth:sanctum')->group(function () {
 
     // Auth
     Route::post('/auth/logout', [AuthController::class, 'logout']);
-    Route::get('/auth/me',[AuthController::class, 'me']);
+    Route::get('/auth/me', [AuthController::class, 'me']);
+    Route::patch('/auth/profile', [AuthController::class, 'updateProfile']);
 
-
-    // Livraison
+    // Livraisons
     Route::prefix('deliveries')->group(function () {
-        Route::get('/',                              [DeliveryController::class, 'index'])
-            ->middleware('role:client|admin|driver');
-        Route::post('/',                             [DeliveryController::class, 'store'])
-            ->middleware('role:admin');
-        Route::get('/{delivery}',                   [DeliveryController::class, 'show'])
-            ->middleware('role:client|admin|driver');
-        Route::patch('/{delivery}/status',          [DeliveryController::class, 'updateStatus'])
-            ->middleware('role:driver|admin');
+        Route::get('/',                              [DeliveryController::class, 'index'])->middleware('role:client|admin|driver');
+        Route::post('/',                             [DeliveryController::class, 'store'])->middleware('role:admin|client');
+        Route::get('/{delivery}',                   [DeliveryController::class, 'show'])->middleware('role:client|admin|driver');
+        Route::patch('/{delivery}/status',          [DeliveryController::class, 'updateStatus'])->middleware('role:driver|admin');
+        Route::post('/{delivery}/accept',           [DeliveryController::class, 'accept'])->middleware('role:driver');
     });
 
-    // Livreur
+    // Espace Livreur
     Route::prefix('driver')->middleware('role:driver')->group(function () {
         Route::get('/deliveries',   [DriverController::class, 'myDeliveries']);
-        Route::post('/location',    [DriverController::class, 'updateLocation']);
+        Route::put('/location',     [DriverController::class, 'updateLocationV2']); // Seule route conservée
         Route::patch('/status',     [DriverController::class, 'updateStatus']);
     });
 
-    // Admin
+    // Espace Admin
     Route::prefix('admin')->middleware('role:admin')->group(function () {
         Route::get('/dashboard',                        [AdminController::class, 'dashboard']);
         Route::get('/drivers',                          [AdminController::class, 'drivers']);

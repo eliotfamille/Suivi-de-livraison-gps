@@ -12,7 +12,9 @@ return new class extends Migration
             $table->id();
             $table->string('order_number')->unique();
             $table->foreignId('client_id')->constrained('users');
-            $table->foreignId('package_id')->constrained('packages');
+
+            // LIGNE CORRIGÉE : Liaison propre avec cascade
+            $table->foreignId('package_id')->constrained('packages')->cascadeOnDelete();
 
             // Adresse expéditeur
             $table->string('sender_name');
@@ -31,6 +33,7 @@ return new class extends Migration
             $table->enum('priority', ['normal', 'express', 'urgent'])->default('normal');
             $table->decimal('delivery_fee', 10, 2)->default(0);
             $table->timestamp('scheduled_at')->nullable();
+
             $table->timestamps();
             $table->softDeletes();
         });

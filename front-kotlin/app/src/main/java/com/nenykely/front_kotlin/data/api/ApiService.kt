@@ -22,12 +22,33 @@ interface ApiService {
     suspend fun me(@Header("Authorization") token: String): Response<User>
 
     @Headers("Accept: application/json")
+    @PATCH("api/auth/profile")
+    suspend fun updateProfile(
+        @Header("Authorization") token: String,
+        @Body body: Map<String, String?>
+    ): Response<User>
+
+    @Headers("Accept: application/json")
     @GET("api/tracking/{identifier}")
     suspend fun tracking(@Path("identifier") identifier: String): Response<Delivery>
 
     @Headers("Accept: application/json")
     @GET("api/deliveries")
     suspend fun getDeliveries(@Header("Authorization") token: String): Response<List<Delivery>>
+
+    @Headers("Accept: application/json")
+    @POST("api/deliveries")
+    suspend fun storeDelivery(
+        @Header("Authorization") token: String,
+        @Body request: StoreDeliveryRequest
+    ): Response<DeliveryResponse>
+
+    @Headers("Accept: application/json")
+    @POST("api/deliveries/{id}/accept")
+    suspend fun acceptDelivery(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int
+    ): Response<Delivery>
 
     @Headers("Accept: application/json")
     @GET("api/deliveries/{id}")
@@ -48,6 +69,13 @@ interface ApiService {
     @Headers("Accept: application/json")
     @POST("api/driver/location")
     suspend fun updateDriverLocation(
+        @Header("Authorization") token: String,
+        @Body location: Map<String, Double>
+    ): Response<Unit>
+
+    @Headers("Accept: application/json")
+    @PUT("api/drivers/location")
+    suspend fun updateDriverLocationV2(
         @Header("Authorization") token: String,
         @Body location: Map<String, Double>
     ): Response<Unit>

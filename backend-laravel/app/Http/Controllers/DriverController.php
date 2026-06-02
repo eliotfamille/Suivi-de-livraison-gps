@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Delivery;
+use App\Events\DriverLocationUpdated;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -48,6 +49,26 @@ class DriverController extends Controller
                 'recorded_at' => $location->recorded_at,
             ],
         ]);
+    }
+
+    /**
+     * PUT /api/drivers/location — Alternative endpoint requested
+     */
+    public function updateLocationV2(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'latitude'  => 'required|numeric',
+            'longitude' => 'required|numeric',
+        ]);
+
+        $driver = $request->user()->driver;
+        if (!$driver) return response()->json(['message' => 'Livreur non trouvé'], 404);
+
+        $driver->updateLocation($data['latitude'], $data['longitude']);
+
+        broadcast(new DriverLocationUpdated($driver, $data['latitude'], $data['longitude']))->toOthers();
+
+        return response()->json(['message' => 'Position mise à jour']);
     }
 
     /**
