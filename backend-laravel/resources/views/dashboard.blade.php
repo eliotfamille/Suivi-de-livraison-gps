@@ -411,60 +411,6 @@
 
 <div class="layout">
 
-    {{-- SIDEBAR --}}
-    <aside class="sidebar">
-
-        <div class="logo">
-            <div class="logo-dot"></div>
-            GPS Tracker
-        </div>
-
-        <nav>
-            <a class="nav-item active" href="#">
-                ⬡ Dashboard
-            </a>
-
-            <a class="nav-item" href="#">
-                📦 Livraisons
-            </a>
-
-            <a class="nav-item" href="#">
-                🚴 Livreurs
-            </a>
-
-            <a class="nav-item" href="#">
-                👥 Clients
-            </a>
-
-            <a class="nav-item" href="#">
-                🗺️ Carte Live
-            </a>
-
-            <a class="nav-item" href="#">
-                📊 Rapports
-            </a>
-
-            <a class="nav-item" href="#">
-                ⚙️ Paramètres
-            </a>
-        </nav>
-
-        <div style="padding:16px 20px;border-top:1px solid var(--border)">
-            <div style="font-size:12px;color:var(--muted)">
-                Connecté en tant que
-            </div>
-
-            <div style="font-size:13px;font-weight:600">
-                {{ auth()->user()->name ?? 'Administrateur' }}
-            </div>
-
-            <div style="font-size:11px;color:var(--accent)">
-                {{ auth()->user()->email ?? 'admin@delivery.mg' }}
-            </div>
-        </div>
-
-    </aside>
-
     {{-- MAIN --}}
     <main class="main">
 

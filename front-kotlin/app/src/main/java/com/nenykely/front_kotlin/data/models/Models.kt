@@ -90,6 +90,8 @@ data class Driver(
     val vehicle_model: String? = null,
     val vehicle_plate: String? = null,
     val rating: String? = null,
+    val current_lat: Double? = null,
+    val current_lng: Double? = null,
     val user: User? = null
 )
 

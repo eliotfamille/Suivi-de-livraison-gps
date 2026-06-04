@@ -45,6 +45,7 @@ fun TrackingScreen(token: String, deliveryId: Int, viewModel: DeliveryViewModel,
     var rating by remember { mutableStateOf(0) }
     
     var routePoints by remember { mutableStateOf<List<GeoPoint>>(emptyList()) }
+    var isDataFresh by remember { mutableStateOf(false) }
 
     LaunchedEffect(deliveryId) {
         viewModel.fetchTracking(token, deliveryId)
@@ -54,8 +55,34 @@ fun TrackingScreen(token: String, deliveryId: Int, viewModel: DeliveryViewModel,
     val destLng = delivery?.order?.recipient_lng ?: 47.5079
     val destPoint = GeoPoint(destLat, destLng)
     
-    val driverStatus = delivery?.statuses?.firstOrNull { it.lat != null && it.lng != null }
-    val driverPoint = if (driverStatus != null) GeoPoint(driverStatus.lat!!, driverStatus.lng!!) else GeoPoint(destLat - 0.01, destLng - 0.01)
+    var driverPoint by remember { mutableStateOf(GeoPoint(destLat - 0.01, destLng - 0.01)) }
+
+    LaunchedEffect(delivery) {
+        // Priorité 1 : Position temps réel du livreur (si disponible)
+        val currentLat = delivery?.driver?.current_lat
+        val currentLng = delivery?.driver?.current_lng
+
+        if (currentLat != null && currentLng != null && currentLat != 0.0) {
+            driverPoint = GeoPoint(currentLat, currentLng)
+            isDataFresh = true
+        } else {
+            // Priorité 2 : Dernier statut ayant des coordonnées
+            val lastLocation = delivery?.statuses?.filter { it.lat != null && it.lng != null }?.maxByOrNull { it.created_at ?: "" }
+            
+            lastLocation?.let {
+                driverPoint = GeoPoint(it.lat!!, it.lng!!)
+                isDataFresh = true
+            }
+        }
+    }
+
+    // Simulation du temps réel par polling (toutes les 5 secondes)
+    LaunchedEffect(Unit) {
+        while(true) {
+            viewModel.fetchTracking(token, deliveryId)
+            kotlinx.coroutines.delay(5000)
+        }
+    }
 
     LaunchedEffect(driverPoint, destPoint) {
         try {
@@ -183,9 +210,14 @@ fun TrackingScreen(token: String, deliveryId: Int, viewModel: DeliveryViewModel,
                 border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0))
             ) {
                 Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(8.dp).background(Color(0xFF10B981), CircleShape))
+                    Box(modifier = Modifier.size(8.dp).background(if (isDataFresh) Color(0xFF10B981) else Color(0xFFEF4444), CircleShape))
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text("Mise à jour en direct", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
+                    Text(
+                        text = if (isDataFresh) "Synchronisé" else "Recherche GPS...",
+                        style = MaterialTheme.typography.labelLarge, 
+                        fontWeight = FontWeight.Bold, 
+                        color = Color(0xFF1E293B)
+                    )
                 }
             }
         }

@@ -271,7 +271,9 @@ class DeliveryController extends Controller
             ]),
             'driver' => $delivery->driver ? [
                 'id'   => $delivery->driver->id,
-                'user' => ['name' => $delivery->driver->user->name ?? 'N/A']
+                'user' => ['name' => $delivery->driver->user->name ?? 'N/A'],
+                'current_lat' => $delivery->driver->current_lat,
+                'current_lng' => $delivery->driver->current_lng,
             ] : null,
         ];
     }
