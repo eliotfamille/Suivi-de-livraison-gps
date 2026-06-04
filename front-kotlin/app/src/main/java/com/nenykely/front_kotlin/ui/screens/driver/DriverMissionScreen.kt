@@ -1,6 +1,9 @@
 package com.nenykely.front_kotlin.ui.screens.driver
 
 import android.widget.Toast
+import android.util.Log
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -24,6 +27,9 @@ import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,6 +41,10 @@ fun DriverMissionScreen(token: String, deliveryId: Int, viewModel: DeliveryViewM
     // State to store current location for polyline
     var currentLocation by remember { mutableStateOf<GeoPoint?>(null) }
     
+    // State for routing
+    var routePoints by remember { mutableStateOf<List<GeoPoint>>(emptyList()) }
+    var isFetchingRoute by remember { mutableStateOf(false) }
+
     LaunchedEffect(deliveryId) {
         Configuration.getInstance().load(context, context.getSharedPreferences("osmdroid", 0))
         viewModel.fetchTracking(token, deliveryId)
@@ -43,6 +53,60 @@ fun DriverMissionScreen(token: String, deliveryId: Int, viewModel: DeliveryViewM
     val destLat = delivery?.order?.recipient_lat ?: -18.8792
     val destLng = delivery?.order?.recipient_lng ?: 47.5079
     val destPoint = GeoPoint(destLat, destLng)
+
+    // Effect to fetch route when location changes
+    LaunchedEffect(currentLocation, destPoint) {
+        currentLocation?.let { start ->
+            isFetchingRoute = true
+            try {
+                // OSRM expects [longitude,latitude]
+                val url = "https://router.project-osrm.org/route/v1/driving/${start.longitude},${start.latitude};${destPoint.longitude},${destPoint.latitude}?overview=full&geometries=geojson"
+                Log.d("Routing", "Fetching mission route: $url")
+                
+                val response = withContext(Dispatchers.IO) {
+                    val connection = URL(url).openConnection() as HttpURLConnection
+                    connection.connectTimeout = 8000
+                    connection.readTimeout = 8000
+                    connection.setRequestProperty("User-Agent", "Mozilla/5.0")
+                    
+                    if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                        val text = connection.inputStream.bufferedReader().readText()
+                        text
+                    } else {
+                        null
+                    }
+                }
+                
+                if (response != null) {
+                    val json = JSONObject(response)
+                    if (json.getString("code") == "Ok") {
+                        val routes = json.getJSONArray("routes")
+                        if (routes.length() > 0) {
+                            val geometry = routes.getJSONObject(0).getJSONObject("geometry")
+                            val coords = geometry.getJSONArray("coordinates")
+                            val points = mutableListOf<GeoPoint>()
+                            for (i in 0 until coords.length()) {
+                                val coord = coords.getJSONArray(i)
+                                points.add(GeoPoint(coord.getDouble(1), coord.getDouble(0)))
+                            }
+                            routePoints = points
+                            Log.d("Routing", "Mission route parsed: ${points.size} points")
+                        }
+                    } else {
+                        Log.e("Routing", "OSRM Mission Error: ${json.getString("code")}")
+                        routePoints = emptyList()
+                    }
+                } else {
+                    routePoints = emptyList()
+                }
+            } catch (e: Exception) {
+                Log.e("Routing", "Error fetching mission route", e)
+                routePoints = emptyList()
+            } finally {
+                isFetchingRoute = false
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -90,18 +154,34 @@ fun DriverMissionScreen(token: String, deliveryId: Int, viewModel: DeliveryViewM
                     marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                     mapView.overlays.add(marker)
 
-                    // Path (Shortest path as straight line for now)
-                    currentLocation?.let { start ->
+                    // Path (Shortest path via OSRM)
+                    if (routePoints.isNotEmpty()) {
                         val line = Polyline()
-                        line.setPoints(listOf(start, destPoint))
+                        line.setPoints(routePoints)
                         line.outlinePaint.color = android.graphics.Color.BLUE
-                        line.outlinePaint.strokeWidth = 8f
+                        line.outlinePaint.strokeWidth = 10f
                         mapView.overlays.add(line)
+                    } else {
+                        // Fallback straight line
+                        currentLocation?.let { start ->
+                            val line = Polyline()
+                            line.setPoints(listOf(start, destPoint))
+                            line.outlinePaint.color = android.graphics.Color.LTGRAY
+                            line.outlinePaint.strokeWidth = 8f
+                            mapView.overlays.add(line)
+                        }
                     }
                     
                     mapView.invalidate()
                 }
             )
+
+            if (isFetchingRoute) {
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
+                    color = primaryBlue
+                )
+            }
 
             // Mission Details Card
             Surface(

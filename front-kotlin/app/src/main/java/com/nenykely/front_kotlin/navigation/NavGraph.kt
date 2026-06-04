@@ -165,8 +165,9 @@ fun NavGraph(
             })
         }
         composable(Screen.Suivi.route) {
+            val user by authViewModel.user.collectAsState()
             token?.let {
-                SuiviScreen(it, deliveryViewModel)
+                SuiviScreen(it, user, deliveryViewModel)
             }
         }
     }

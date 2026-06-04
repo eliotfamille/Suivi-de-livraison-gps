@@ -1,6 +1,10 @@
 package com.nenykely.front_kotlin.ui.screens.client
 
+import android.widget.Toast
 import android.Manifest
+import android.util.Log
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -26,10 +30,13 @@ import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
-fun SuiviScreen(token: String, viewModel: DeliveryViewModel) {
+fun SuiviScreen(token: String, user: com.nenykely.front_kotlin.data.models.User?, viewModel: DeliveryViewModel) {
     val context = LocalContext.current
     val locationPermissionState = rememberPermissionState(Manifest.permission.ACCESS_FINE_LOCATION)
     val deliveries by viewModel.deliveries.collectAsState()
@@ -37,6 +44,10 @@ fun SuiviScreen(token: String, viewModel: DeliveryViewModel) {
     
     var showPickupPoints by remember { mutableStateOf(true) }
     var selectedDeliveryForInfo by remember { mutableStateOf<Delivery?>(null) }
+    
+    // State for routing
+    var routePoints by remember { mutableStateOf<List<GeoPoint>>(emptyList()) }
+    var isFetchingRoute by remember { mutableStateOf(false) }
 
     // Initialisation OSMDroid
     LaunchedEffect(Unit) {
@@ -45,6 +56,83 @@ fun SuiviScreen(token: String, viewModel: DeliveryViewModel) {
             locationPermissionState.launchPermissionRequest()
         }
         viewModel.fetchDeliveries(token)
+    }
+
+    // Effect to fetch route when a delivery is selected
+    LaunchedEffect(selectedDeliveryForInfo) {
+        selectedDeliveryForInfo?.let { delivery ->
+            val startLat = delivery.order?.sender_lat
+            val startLng = delivery.order?.sender_lng
+            val endLat = delivery.order?.recipient_lat
+            val endLng = delivery.order?.recipient_lng
+
+            if (startLat != null && startLng != null && endLat != null && endLng != null && startLat != 0.0) {
+                isFetchingRoute = true
+                try {
+                    // OSRM expects [longitude,latitude]
+                    val url = "https://router.project-osrm.org/route/v1/driving/$startLng,$startLat;$endLng,$endLat?overview=full&geometries=geojson"
+                    Log.d("Routing", "Fetching route: $url")
+                    
+                    val response = withContext(Dispatchers.IO) {
+                        val connection = URL(url).openConnection() as HttpURLConnection
+                        connection.connectTimeout = 8000
+                        connection.readTimeout = 8000
+                        connection.setRequestProperty("User-Agent", "Mozilla/5.0")
+                        
+                        if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                            val text = connection.inputStream.bufferedReader().readText()
+                            Log.d("Routing", "Response received: ${text.take(100)}...")
+                            text
+                        } else {
+                            val errorText = connection.errorStream?.bufferedReader()?.readText() ?: "No error stream"
+                            Log.e("Routing", "HTTP Error ${connection.responseCode}: $errorText")
+                            null
+                        }
+                    }
+                    
+                    if (response != null) {
+                        val json = JSONObject(response)
+                        if (json.getString("code") == "Ok") {
+                            val routes = json.getJSONArray("routes")
+                            if (routes.length() > 0) {
+                                val geometry = routes.getJSONObject(0).getJSONObject("geometry")
+                                val coords = geometry.getJSONArray("coordinates")
+                                val points = mutableListOf<GeoPoint>()
+                                for (i in 0 until coords.length()) {
+                                    val coord = coords.getJSONArray(i)
+                                    // GeoJSON is [lng, lat]
+                                    points.add(GeoPoint(coord.getDouble(1), coord.getDouble(0)))
+                                }
+                                routePoints = points
+                                Log.d("Routing", "Successfully parsed ${points.size} points")
+                            }
+                        } else {
+                            val code = json.getString("code")
+                            Log.e("Routing", "OSRM Error: $code")
+                            withContext(Dispatchers.Main) {
+                                Toast.makeText(context, "Erreur itinéraire: $code", Toast.LENGTH_SHORT).show()
+                            }
+                            routePoints = listOf(GeoPoint(startLat, startLng), GeoPoint(endLat, endLng))
+                        }
+                    } else {
+                        routePoints = listOf(GeoPoint(startLat, startLng), GeoPoint(endLat, endLng))
+                    }
+                } catch (e: Exception) {
+                    Log.e("Routing", "Error fetching route", e)
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Erreur réseau itinéraire", Toast.LENGTH_SHORT).show()
+                    }
+                    // Fallback to straight line
+                    routePoints = listOf(GeoPoint(startLat, startLng), GeoPoint(endLat, endLng))
+                } finally {
+                    isFetchingRoute = false
+                }
+            } else {
+                routePoints = emptyList()
+            }
+        } ?: run {
+            routePoints = emptyList()
+        }
     }
 
     Scaffold(
@@ -112,17 +200,26 @@ fun SuiviScreen(token: String, viewModel: DeliveryViewModel) {
                     }
 
                     selectedDeliveryForInfo?.let { delivery ->
-                        val startLat = delivery.order?.sender_lat
-                        val startLng = delivery.order?.sender_lng
-                        val endLat = delivery.order?.recipient_lat
-                        val endLng = delivery.order?.recipient_lng
-
-                        if (startLat != null && startLng != null && endLat != null && endLng != null) {
+                        if (routePoints.isNotEmpty()) {
                             val line = Polyline()
-                            line.setPoints(listOf(GeoPoint(startLat, startLng), GeoPoint(endLat, endLng)))
+                            line.setPoints(routePoints)
                             line.outlinePaint.color = android.graphics.Color.BLUE
-                            line.outlinePaint.strokeWidth = 5f
+                            line.outlinePaint.strokeWidth = 10f
                             mapView.overlays.add(line)
+                        } else {
+                            // Fallback to straight line if no route fetched yet
+                            val startLat = delivery.order?.sender_lat
+                            val startLng = delivery.order?.sender_lng
+                            val endLat = delivery.order?.recipient_lat
+                            val endLng = delivery.order?.recipient_lng
+
+                            if (startLat != null && startLng != null && endLat != null && endLng != null) {
+                                val line = Polyline()
+                                line.setPoints(listOf(GeoPoint(startLat, startLng), GeoPoint(endLat, endLng)))
+                                line.outlinePaint.color = android.graphics.Color.LTGRAY
+                                line.outlinePaint.strokeWidth = 5f
+                                mapView.overlays.add(line)
+                            }
                         }
                     }
                     
@@ -130,6 +227,13 @@ fun SuiviScreen(token: String, viewModel: DeliveryViewModel) {
                 }
             )
             
+            if (isFetchingRoute) {
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
+                    color = primaryBlue
+                )
+            }
+
             selectedDeliveryForInfo?.let { delivery ->
                 Surface(
                     modifier = Modifier
@@ -149,16 +253,31 @@ fun SuiviScreen(token: String, viewModel: DeliveryViewModel) {
                         
                         Spacer(modifier = Modifier.height(12.dp))
                         
-                        if (delivery.status == "pending" || delivery.status == "assigned") {
+                        // Restriction : Seuls les livreurs peuvent accepter
+                        if (user?.isDriver() == true && (delivery.status == "pending" || delivery.status == "assigned")) {
                             Button(
                                 onClick = {
                                     viewModel.acceptDelivery(token, delivery.id) {
                                         selectedDeliveryForInfo = null
                                     }
                                 },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(containerColor = primaryBlue)
+                            ) {
+                                Text("Accepter la livraison (Livreur)")
+                            }
+                        } else if (user?.isDriver() == false) {
+                            Surface(
+                                color = Color(0xFFF1F5F9),
+                                shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("Accepter la livraison")
+                                Text(
+                                    "Consultation client uniquement",
+                                    modifier = Modifier.padding(8.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.Gray
+                                )
                             }
                         }
                     }

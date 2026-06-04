@@ -117,6 +117,12 @@ return new class extends Migration
         app('cache')
             ->store(config('permission.cache.store') != 'default' ? config('permission.cache.store') : null)
             ->forget(config('permission.cache.key'));
+
+        // Création des rôles par défaut pour éviter le db:seed manuel
+        $roles = ['admin', 'driver', 'client'];
+        foreach ($roles as $roleName) {
+            \Spatie\Permission\Models\Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
+        }
     }
 
     /**
