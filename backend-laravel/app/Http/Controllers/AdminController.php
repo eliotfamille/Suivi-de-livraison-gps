@@ -52,6 +52,9 @@ class AdminController extends Controller
     }
     public function dashboard(Request $request): JsonResponse
     {
+        $now = now();
+        $startOfMonth = $now->copy()->startOfMonth();
+
         $stats = [
             'deliveries' => [
                 'total'      => Delivery::count(),
@@ -61,22 +64,40 @@ class AdminController extends Controller
                 'failed'     => Delivery::where('status', 'failed')->count(),
                 'today'      => Delivery::whereDate('created_at', today())->count(),
                 'this_week'  => Delivery::whereBetween('created_at', [now()->startOfWeek(), now()])->count(),
+                'avg_delivery_time_minutes' => Delivery::where('status', 'delivered')
+                    ->whereNotNull('assigned_at')
+                    ->get()
+                    ->avg(fn($d) => now()->parse($d->assigned_at)->diffInMinutes($d->updated_at)),
             ],
             'drivers' => [
                 'total'     => Driver::count(),
                 'available' => Driver::where('status', 'available')->count(),
                 'busy'      => Driver::where('status', 'busy')->count(),
                 'offline'   => Driver::where('status', 'offline')->count(),
+                'performance' => Driver::withCount(['deliveries' => fn($q) => $q->where('status', 'delivered')])
+                    ->orderByDesc('deliveries_count')
+                    ->take(5)
+                    ->get()
+                    ->map(fn($d) => [
+                        'name' => $d->user->name,
+                        'count' => $d->deliveries_count,
+                        'rating' => $d->rating
+                    ]),
             ],
-            'clients' => [
-                'total' => User::role('client')->count(),
-                'new_this_month' => User::role('client')
-                    ->whereMonth('created_at', now()->month)
-                    ->count(),
+            'zones' => [
+                'most_active' => Order::select('recipient_address', \DB::raw('count(*) as total'))
+                    ->groupBy('recipient_address')
+                    ->orderByDesc('total')
+                    ->take(5)
+                    ->get()
+                    ->map(fn($o) => [
+                        'label' => str_contains($o->recipient_address, '(') ? explode('(', $o->recipient_address)[1] : 'Inconnue',
+                        'total' => $o->total
+                    ]),
             ],
             'revenue' => [
                 'total'      => Order::sum('delivery_fee'),
-                'this_month' => Order::whereMonth('created_at', now()->month)->sum('delivery_fee'),
+                'this_month' => Order::whereMonth('created_at', $now->month)->sum('delivery_fee'),
                 'today'      => Order::whereDate('created_at', today())->sum('delivery_fee'),
             ],
         ];
@@ -112,7 +133,7 @@ class AdminController extends Controller
                 'rating'        => $d->rating,
             ]);
 
-        
+
         return response()->json([
             'stats'             => $stats,
             'recent_deliveries' => $recentDeliveries,
@@ -178,6 +199,38 @@ class AdminController extends Controller
 
         return response()->json([
             'message' => "Livraison assignée à {$driver->user->name}",
+        ]);
+    }
+
+    /**
+     * Export Excel (CSV pour éviter de créer une classe Export)
+     */
+    public function exportPerformance()
+    {
+        $drivers = Driver::with('user')->withCount(['deliveries' => fn($q) => $q->where('status', 'delivered')])->get();
+
+        $callback = function() use ($drivers) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, ['ID', 'Nom', 'Livraisons Realisees', 'Note Moyenne', 'Email']);
+
+            foreach ($drivers as $driver) {
+                fputcsv($file, [
+                    $driver->id,
+                    $driver->user->name,
+                    $driver->deliveries_count,
+                    $driver->rating,
+                    $driver->user->email
+                ]);
+            }
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, [
+            "Content-type"        => "text/csv",
+            "Content-Disposition" => "attachment; filename=performance_livreurs_" . date('Y-m-d') . ".csv",
+            "Pragma"              => "no-cache",
+            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+            "Expires"             => "0"
         ]);
     }
 }

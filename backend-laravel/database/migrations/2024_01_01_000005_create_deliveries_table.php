@@ -28,6 +28,7 @@ return new class extends Migration
             $table->timestamp('picked_up_at')->nullable();
             $table->timestamp('delivered_at')->nullable();
             $table->timestamp('estimated_arrival')->nullable();
+            $table->integer('rating')->nullable();
             $table->timestamps();
         });
     }

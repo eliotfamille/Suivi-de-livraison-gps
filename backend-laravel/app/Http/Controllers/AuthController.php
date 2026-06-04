@@ -90,9 +90,20 @@ class AuthController extends Controller
     {
         $user = $request->user()->load('driver');
 
-        return response()->json([
-            'user' => $this->userResource($user),
+        return response()->json($this->userResource($user));
+    }
+
+    public function updateProfile(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $data = $request->validate([
+            'name'  => 'nullable|string|max:255',
+            'phone' => 'nullable|string|max:20',
         ]);
+
+        $user->update($data);
+
+        return response()->json($this->userResource($user));
     }
 
     private function userResource(User $user): array

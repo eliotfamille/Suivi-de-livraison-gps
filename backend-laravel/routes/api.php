@@ -29,6 +29,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{delivery}',                   [DeliveryController::class, 'show'])->middleware('role:client|admin|driver');
         Route::patch('/{delivery}/status',          [DeliveryController::class, 'updateStatus'])->middleware('role:driver|admin');
         Route::post('/{delivery}/accept',           [DeliveryController::class, 'accept'])->middleware('role:driver');
+        Route::post('/{delivery}/rate',             [DeliveryController::class, 'rate'])->middleware('role:client');
+        Route::get('/{delivery}/receipt',            [DeliveryController::class, 'downloadReceipt']);
     });
 
     // Espace Livreur
@@ -43,5 +45,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/dashboard',                        [AdminController::class, 'dashboard']);
         Route::get('/drivers',                          [AdminController::class, 'drivers']);
         Route::post('/deliveries/{delivery}/assign',    [AdminController::class, 'assignDriver']);
+        Route::get('/performance/export',               [AdminController::class, 'exportPerformance']);
     });
 });

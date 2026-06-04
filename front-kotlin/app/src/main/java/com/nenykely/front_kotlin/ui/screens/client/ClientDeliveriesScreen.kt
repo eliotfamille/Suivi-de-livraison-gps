@@ -219,6 +219,7 @@ fun SubmitDeliveryDialog(onDismiss: () -> Unit, onSubmit: (Map<String, Any?>) ->
                         modifier = Modifier.fillMaxSize(),
                         factory = { ctx ->
                             Configuration.getInstance().load(ctx, ctx.getSharedPreferences("osmdroid", 0))
+                            Configuration.getInstance().userAgentValue = ctx.packageName
                             MapView(ctx).apply {
                                 setTileSource(TileSourceFactory.MAPNIK)
                                 setMultiTouchControls(true)

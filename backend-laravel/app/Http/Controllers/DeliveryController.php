@@ -61,6 +61,17 @@ class DeliveryController extends Controller
             // LOG ÉTAPE 3 : Début enregistrement BDD
             \Log::info("Enregistrement en base de données pour l'utilisateur ID: " . $request->user()->id);
 
+            // GESTION ZONES ET TARIFICATION
+            $zones = [
+                'Zone Urbaine'   => 5.00,
+                'Zone Suburbaine' => 10.00,
+                'Zone Rurale'    => 20.00
+            ];
+
+            // Logique de tarification simple basée sur le texte de l'adresse ou la zone envoyée
+            $zone = $request->zone ?? 'Zone Urbaine';
+            $fee  = $zones[$zone] ?? 5.00;
+
             $package = Package::create([
                 'description' => $request->description,
                 'weight_kg'   => $request->weight_kg ?? 0,
@@ -77,9 +88,10 @@ class DeliveryController extends Controller
                 'sender_lng'        => $request->sender_lng,
                 'recipient_name'    => $request->recipient_name,
                 'recipient_phone'   => $request->recipient_phone,
-                'recipient_address' => $request->recipient_address,
+                'recipient_address' => $request->recipient_address . " ($zone)", // Stockage de la zone dans l'adresse
                 'recipient_lat'     => $request->recipient_lat,
                 'recipient_lng'     => $request->recipient_lng,
+                'delivery_fee'      => $fee,
             ]);
 
             $delivery = Delivery::create([
@@ -112,6 +124,15 @@ class DeliveryController extends Controller
         return response()->json($this->deliveryResource($delivery->load(['order.package', 'statuses', 'driver.user'])));
     }
 
+    public function tracking($identifier): JsonResponse
+    {
+        $delivery = Delivery::whereHas('order', function($q) use ($identifier) {
+            $q->where('order_number', $identifier);
+        })->with(['order.package', 'statuses', 'driver.user'])->firstOrFail();
+
+        return response()->json($this->deliveryResource($delivery));
+    }
+
     public function accept(Request $request, Delivery $delivery): JsonResponse
     {
         if ($delivery->driver_id) {
@@ -138,18 +159,85 @@ class DeliveryController extends Controller
 
     public function updateStatus(Request $request, Delivery $delivery): JsonResponse
     {
-        $request->validate(['status' => 'required|string']);
+        $request->validate([
+            'status' => 'required|string',
+            'proof_photo' => 'nullable|image|max:2048',
+            'signature' => 'nullable|string', // Base64 signature
+        ]);
 
-        $delivery->update(['status' => $request->status]);
+        $data = ['status' => $request->status];
+
+        if ($request->hasFile('proof_photo')) {
+            $path = $request->file('proof_photo')->store('proofs', 'public');
+            $data['proof_photo'] = $path;
+        }
+
+        if ($request->signature) {
+            $data['signature'] = $request->signature;
+        }
+
+        $delivery->update($data);
 
         $delivery->statuses()->create([
             'status' => $request->status,
             'label'  => ucfirst($request->status),
             'lat'    => $request->latitude,
             'lng'    => $request->longitude,
+            'note'   => $request->note
         ]);
 
+        // Webhook notification (simulation)
+        try {
+            \Illuminate\Support\Facades\Http::post('https://webhook.site/external-transporter', [
+                'delivery_id' => $delivery->id,
+                'status' => $request->status,
+                'timestamp' => now()
+            ]);
+        } catch (\Exception $e) {
+            \Log::warning("Webhook failed: " . $e->getMessage());
+        }
+
+        // Push Notification (Simulation FCM)
+        try {
+            $clientToken = $delivery->order->client->fcm_token;
+            if ($clientToken) {
+                \Log::info("Push Notification envoyée à {$delivery->order->client->name} : Statut {$request->status}");
+                // Appel API Firebase ici normalement
+            }
+        } catch (\Exception $e) {
+            \Log::error("FCM failed: " . $e->getMessage());
+        }
+
         return response()->json($this->deliveryResource($delivery));
+    }
+
+    /**
+     * POST /api/deliveries/{id}/rate — Notation de la livraison
+     */
+    public function rate(Request $request, Delivery $delivery): JsonResponse
+    {
+        $request->validate(['rating' => 'required|integer|min:1|max:5']);
+        $delivery->update(['rating' => $request->rating]);
+        return response()->json(['message' => 'Merci pour votre note !']);
+    }
+
+    /**
+     * Rapport PDF de livraison
+     */
+    public function downloadReceipt(Delivery $delivery)
+    {
+        // On utilise DomPDF directement sans nouveau fichier vue (on passe du HTML)
+        $html = "<h1>Bon de Livraison #{$delivery->id}</h1>";
+        $html .= "<p>Statut: {$delivery->status}</p>";
+        $html .= "<p>Client: {$delivery->order->recipient_name}</p>";
+        $html .= "<p>Adresse: {$delivery->order->recipient_address}</p>";
+        if ($delivery->signature) {
+            $html .= "<p>Signature: <br/><img src='{$delivery->signature}' width='200'/></p>";
+        }
+
+        $pdf = \App::make('dompdf.wrapper');
+        $pdf->loadHTML($html);
+        return $pdf->download("receipt-{$delivery->id}.pdf");
     }
 
     private function deliveryResource($delivery): array

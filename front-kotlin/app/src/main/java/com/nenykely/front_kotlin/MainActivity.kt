@@ -37,6 +37,7 @@ import com.nenykely.front_kotlin.ui.screens.common.*
 import com.nenykely.front_kotlin.ui.theme.FrontkotlinTheme
 import com.nenykely.front_kotlin.viewmodel.AuthViewModel
 import com.nenykely.front_kotlin.viewmodel.DeliveryViewModel
+import org.osmdroid.config.Configuration
 
 class MainActivity : ComponentActivity() {
     private val authViewModel: AuthViewModel by viewModels()
@@ -44,9 +45,16 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Initialisation globale d'osmdroid
+        Configuration.getInstance().load(this, getSharedPreferences("osmdroid", 0))
+        Configuration.getInstance().userAgentValue = packageName
+
         enableEdgeToEdge()
         setContent {
-            FrontkotlinTheme {
+            val isDarkMode by authViewModel.isDarkMode.collectAsState()
+            
+            FrontkotlinTheme(darkTheme = isDarkMode) {
                 val navController = rememberNavController()
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentDestination = navBackStackEntry?.destination

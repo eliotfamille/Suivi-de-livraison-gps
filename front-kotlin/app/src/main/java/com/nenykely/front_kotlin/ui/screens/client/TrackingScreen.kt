@@ -1,5 +1,7 @@
 package com.nenykely.front_kotlin.ui.screens.client
 
+import android.widget.Toast
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -17,16 +19,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.unit.sp
 import com.nenykely.front_kotlin.viewmodel.DeliveryViewModel
+import androidx.compose.ui.viewinterop.AndroidView
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
-import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
-import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,8 +41,12 @@ fun TrackingScreen(token: String, deliveryId: Int, viewModel: DeliveryViewModel,
     val delivery by viewModel.currentDelivery.collectAsState()
     val primaryBlue = Color(0xFF2563EB)
     
+    var showRatingDialog by remember { mutableStateOf(false) }
+    var rating by remember { mutableStateOf(0) }
+    
+    var routePoints by remember { mutableStateOf<List<GeoPoint>>(emptyList()) }
+
     LaunchedEffect(deliveryId) {
-        Configuration.getInstance().load(context, context.getSharedPreferences("osmdroid", 0))
         viewModel.fetchTracking(token, deliveryId)
     }
 
@@ -47,45 +57,101 @@ fun TrackingScreen(token: String, deliveryId: Int, viewModel: DeliveryViewModel,
     val driverStatus = delivery?.statuses?.firstOrNull { it.lat != null && it.lng != null }
     val driverPoint = if (driverStatus != null) GeoPoint(driverStatus.lat!!, driverStatus.lng!!) else GeoPoint(destLat - 0.01, destLng - 0.01)
 
+    LaunchedEffect(driverPoint, destPoint) {
+        try {
+            val url = "https://router.project-osrm.org/route/v1/driving/${driverPoint.longitude},${driverPoint.latitude};${destPoint.longitude},${destPoint.latitude}?overview=full&geometries=geojson"
+            val response = withContext(Dispatchers.IO) {
+                val connection = URL(url).openConnection() as HttpURLConnection
+                connection.setRequestProperty("User-Agent", "Mozilla/5.0")
+                if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                    connection.inputStream.bufferedReader().readText()
+                } else null
+            }
+            response?.let {
+                val json = JSONObject(it)
+                if (json.getString("code") == "Ok") {
+                    val routes = json.getJSONArray("routes")
+                    if (routes.length() > 0) {
+                        val geometry = routes.getJSONObject(0).getJSONObject("geometry")
+                        val coords = geometry.getJSONArray("coordinates")
+                        val points = mutableListOf<GeoPoint>()
+                        for (i in 0 until coords.length()) {
+                            val coord = coords.getJSONArray(i)
+                            points.add(GeoPoint(coord.getDouble(1), coord.getDouble(0)))
+                        }
+                        routePoints = points
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            routePoints = listOf(driverPoint, destPoint)
+        }
+    }
+
+    if (showRatingDialog) {
+        AlertDialog(
+            onDismissRequest = { showRatingDialog = false },
+            title = { Text("Notez votre livraison") },
+            text = {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                    (1..5).forEach { index ->
+                        IconButton(onClick = { rating = index }) {
+                            Icon(
+                                if (index <= rating) Icons.Default.Star else Icons.Default.StarOutline,
+                                contentDescription = null,
+                                tint = if (index <= rating) Color(0xFFF59E0B) else Color.Gray
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = { 
+                    Toast.makeText(context, "Merci pour votre note de $rating/5 !", Toast.LENGTH_SHORT).show()
+                    showRatingDialog = false 
+                }) {
+                    Text("Valider")
+                }
+            }
+        )
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
+                Configuration.getInstance().load(ctx, ctx.getSharedPreferences("osmdroid", 0))
+                Configuration.getInstance().userAgentValue = ctx.packageName
                 MapView(ctx).apply {
                     setTileSource(TileSourceFactory.MAPNIK)
                     setMultiTouchControls(true)
-                    controller.setZoom(13.0)
-                    controller.setCenter(destPoint)
-                    
-                    // Ajout de la position actuelle
-                    val locationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(ctx), this)
-                    locationOverlay.enableMyLocation()
-                    overlays.add(locationOverlay)
+                    controller.setZoom(14.0)
+                    controller.setCenter(driverPoint)
                 }
             },
             update = { mapView ->
                 mapView.overlays.removeAll { it is Marker || it is Polyline }
                 
-                // Marqueur Destination
+                // Destination Marker
                 val destMarker = Marker(mapView)
                 destMarker.position = destPoint
                 destMarker.title = "Destination"
-                destMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                 mapView.overlays.add(destMarker)
                 
-                // Marqueur Livreur
+                // Driver Marker
                 val driverMarker = Marker(mapView)
                 driverMarker.position = driverPoint
                 driverMarker.title = "Livreur"
-                driverMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                 mapView.overlays.add(driverMarker)
 
-                // Ligne de trajet
-                val line = Polyline()
-                line.setPoints(listOf(driverPoint, destPoint))
-                line.outlinePaint.color = android.graphics.Color.BLUE
-                line.outlinePaint.strokeWidth = 5f
-                mapView.overlays.add(line)
+                // Route Polyline
+                if (routePoints.isNotEmpty()) {
+                    val line = Polyline()
+                    line.setPoints(routePoints)
+                    line.outlinePaint.color = android.graphics.Color.BLUE
+                    line.outlinePaint.strokeWidth = 10f
+                    mapView.overlays.add(line)
+                }
                 
                 mapView.invalidate()
             }
@@ -186,7 +252,7 @@ fun TrackingScreen(token: String, deliveryId: Int, viewModel: DeliveryViewModel,
                             }
                         }
                         Surface(modifier = Modifier.size(48.dp), shape = CircleShape, color = primaryBlue, onClick = {}) {
-                            Icon(Icons.Default.Call, null, modifier = Modifier.padding(12.dp), tint = Color.White)
+                            Icon(Icons.Default.Call, null, modifier = Modifier.padding(12.dp), tint = Color(0.0f, 0.0f, 0.0f, 1.0f))
                         }
                     }
                 }

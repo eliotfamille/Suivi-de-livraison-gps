@@ -12,7 +12,7 @@ class Delivery extends Model
     protected $fillable = [
         'order_id', 'driver_id', 'status', 'failure_reason',
         'proof_photo', 'signature', 'assigned_at', 'picked_up_at',
-        'delivered_at', 'estimated_arrival',
+        'delivered_at', 'estimated_arrival', 'rating'
     ];
 
     protected $casts = [

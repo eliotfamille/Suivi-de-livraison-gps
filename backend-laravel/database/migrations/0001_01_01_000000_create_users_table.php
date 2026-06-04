@@ -21,6 +21,7 @@ return new class extends Migration
             // NOUVELLES COLONNES AJOUTÉES ICI
             $table->string('domicile')->nullable();
             $table->string('bureau')->nullable();
+            $table->string('fcm_token')->nullable();
 
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');

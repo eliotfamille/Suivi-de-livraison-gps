@@ -13,7 +13,7 @@ class Order extends Model
     protected $fillable = [
         'order_number', 'client_id', 'package_id',
         'sender_name', 'sender_phone', 'sender_address', 'sender_lat', 'sender_lng',
-        'recipient_name', 'recipient_phone', 'recipient_address', 'recipient_lat', 'recipient_lng',
+        'recipient_name', 'recipient_phone', 'recipient_address', 'zone', 'recipient_lat', 'recipient_lng',
         'priority', 'delivery_fee', 'scheduled_at',
     ];
 

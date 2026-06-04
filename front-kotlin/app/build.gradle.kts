@@ -65,9 +65,15 @@ dependencies {
     implementation(libs.navigation.compose)
 
     // Maps
-    implementation(libs.osmdroid)
     implementation(libs.play.services.location)
     implementation(libs.accompanist.permissions)
+    implementation(libs.osmdroid.android)
+
+    // Camera
+    implementation(libs.camera.core)
+    implementation(libs.camera.camera2)
+    implementation(libs.camera.lifecycle)
+    implementation(libs.camera.view)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

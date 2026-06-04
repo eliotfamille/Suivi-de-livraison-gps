@@ -26,7 +26,8 @@ class User extends Authenticatable
         'phone',
         'avatar',
         'domicile',
-        'bureau'
+        'bureau',
+        'fcm_token'
     ];
 
     /**

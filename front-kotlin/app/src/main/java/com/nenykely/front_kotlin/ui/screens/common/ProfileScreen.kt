@@ -164,11 +164,17 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
             }
             
             ProfileSection(title = "PRÉFÉRENCES") {
+                val isDarkMode by viewModel.isDarkMode.collectAsState()
                 PreferenceItem(icon = Icons.Default.Notifications, label = "Notifications Push", isChecked = true)
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color(0xFFF1F5F9))
                 PreferenceItem(icon = Icons.Default.AlternateEmail, label = "Emails de suivi", isChecked = false)
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color(0xFFF1F5F9))
-                PreferenceItem(icon = Icons.Default.DarkMode, label = "Mode Sombre", isChecked = false)
+                PreferenceItem(
+                    icon = Icons.Default.DarkMode, 
+                    label = "Mode Sombre", 
+                    isChecked = isDarkMode,
+                    onCheckedChange = { viewModel.toggleDarkMode() }
+                )
             }
             
             Spacer(modifier = Modifier.height(24.dp))
@@ -256,8 +262,7 @@ fun AddressItem(icon: ImageVector, label: String, address: String, onClick: () -
 }
 
 @Composable
-fun PreferenceItem(icon: ImageVector, label: String, isChecked: Boolean) {
-    var checked by remember { mutableStateOf(isChecked) }
+fun PreferenceItem(icon: ImageVector, label: String, isChecked: Boolean, onCheckedChange: (Boolean) -> Unit = {}) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -266,8 +271,8 @@ fun PreferenceItem(icon: ImageVector, label: String, isChecked: Boolean) {
         Spacer(modifier = Modifier.width(16.dp))
         Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = Color(0xFF1E293B))
         Switch(
-            checked = checked,
-            onCheckedChange = { checked = it },
+            checked = isChecked,
+            onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Color(0xFF2563EB))
         )
     }
