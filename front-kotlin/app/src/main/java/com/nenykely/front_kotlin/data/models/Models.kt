@@ -9,7 +9,12 @@ data class User(
     val roles: List<String>? = null,
     val role: String? = null,
     val domicile: String? = null,
-    val bureau: String? = null
+    val domicile_lat: Double? = null,
+    val domicile_lng: Double? = null,
+    val bureau: String? = null,
+    val bureau_lat: Double? = null,
+    val bureau_lng: Double? = null,
+    val driver: DriverProfile? = null
 ) {
     fun isDriver(): Boolean {
         return role?.equals("driver", ignoreCase = true) == true || 
@@ -89,10 +94,20 @@ data class Driver(
     val vehicle_type: String? = null,
     val vehicle_model: String? = null,
     val vehicle_plate: String? = null,
-    val rating: String? = null,
+    val rating: Double? = 0.0,
+    val rating_count: Int? = 0,
     val current_lat: Double? = null,
     val current_lng: Double? = null,
     val user: User? = null
+)
+
+data class DriverProfile(
+    val id: Int,
+    val status: String? = null,
+    val vehicle_type: String? = null,
+    val vehicle_plate: String? = null,
+    val rating: Double? = 0.0,
+    val rating_count: Int? = 0
 )
 
 data class Status(

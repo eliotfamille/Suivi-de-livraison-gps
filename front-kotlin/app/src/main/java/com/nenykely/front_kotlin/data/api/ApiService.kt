@@ -1,6 +1,8 @@
 package com.nenykely.front_kotlin.data.api
 
 import com.nenykely.front_kotlin.data.models.*
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.Response
 import retrofit2.http.*
 
@@ -27,6 +29,26 @@ interface ApiService {
         @Header("Authorization") token: String,
         @Body body: Map<String, String?>
     ): Response<User>
+
+    @Multipart
+    @POST("api/auth/profile") // We use POST for multipart in Laravel usually, or PATCH with _method
+    suspend fun updateProfileMultipart(
+        @Header("Authorization") token: String,
+        @Part("name") name: okhttp3.RequestBody?,
+        @Part("phone") phone: okhttp3.RequestBody?,
+        @Part("domicile") domicile: okhttp3.RequestBody?,
+        @Part("domicile_lat") domicile_lat: okhttp3.RequestBody?,
+        @Part("domicile_lng") domicile_lng: okhttp3.RequestBody?,
+        @Part avatar: okhttp3.MultipartBody.Part?,
+        @Part("_method") method: okhttp3.RequestBody = "PATCH".toRequestBody("text/plain".toMediaTypeOrNull())
+    ): Response<User>
+
+    @Headers("Accept: application/json")
+    @GET("api/users")
+    suspend fun getUsers(
+        @Header("Authorization") token: String,
+        @Query("search") search: String? = null
+    ): Response<List<User>>
 
     @Headers("Accept: application/json")
     @GET("api/tracking/{identifier}")
@@ -74,7 +96,7 @@ interface ApiService {
     ): Response<Unit>
 
     @Headers("Accept: application/json")
-    @PUT("api/drivers/location")
+    @PUT("api/driver/location")
     suspend fun updateDriverLocationV2(
         @Header("Authorization") token: String,
         @Body location: Map<String, Double>

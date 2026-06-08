@@ -68,6 +68,7 @@ dependencies {
     implementation(libs.play.services.location)
     implementation(libs.accompanist.permissions)
     implementation(libs.osmdroid.android)
+    implementation(libs.coil.compose)
 
     // Camera
     implementation(libs.camera.core)

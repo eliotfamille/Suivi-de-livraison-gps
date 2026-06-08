@@ -12,7 +12,7 @@ class Driver extends Model
     protected $fillable = [
         'user_id', 'license_number', 'vehicle_type', 'vehicle_plate',
         'vehicle_model', 'status', 'current_lat', 'current_lng',
-        'last_location_at', 'rating', 'total_deliveries',
+        'last_location_at', 'rating', 'rating_count', 'total_deliveries',
     ];
 
     protected $casts = [
@@ -54,11 +54,16 @@ class Driver extends Model
             'status'           => 'busy',
         ]);
 
+        $activeDelivery = $this->activeDelivery;
+        if ($activeDelivery) {
+            $activeDelivery->calculateETA();
+        }
+
         // Enregistrer dans l'historique
         return $this->locations()->create(array_merge([
             'lat'         => $lat,
             'lng'         => $lng,
-            'delivery_id' => $this->activeDelivery?->id,
+            'delivery_id' => $activeDelivery?->id,
             'recorded_at' => now(),
         ], $extra));
     }

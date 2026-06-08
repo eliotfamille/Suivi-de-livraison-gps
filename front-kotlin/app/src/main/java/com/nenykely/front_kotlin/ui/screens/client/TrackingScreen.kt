@@ -1,7 +1,6 @@
 package com.nenykely.front_kotlin.ui.screens.client
 
 import android.widget.Toast
-import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -14,7 +13,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -22,17 +20,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nenykely.front_kotlin.viewmodel.DeliveryViewModel
 import androidx.compose.ui.viewinterop.AndroidView
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,6 +35,17 @@ fun TrackingScreen(token: String, deliveryId: Int, viewModel: DeliveryViewModel,
     val context = LocalContext.current
     val delivery by viewModel.currentDelivery.collectAsState()
     val primaryBlue = Color(0xFF2563EB)
+
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
+    val formatTime: (String?) -> String = { isoString ->
+        try {
+            if (isoString.isNullOrBlank()) "--:--"
+            else if (isoString.length <= 5) isoString // Déjà au format HH:mm
+            else ZonedDateTime.parse(isoString).format(timeFormatter)
+        } catch (e: Exception) {
+            isoString?.take(16)?.replace("T", " ") ?: "--:--"
+        }
+    }
     
     var showRatingDialog by remember { mutableStateOf(false) }
     var rating by remember { mutableStateOf(0) }
@@ -55,63 +61,45 @@ fun TrackingScreen(token: String, deliveryId: Int, viewModel: DeliveryViewModel,
     val destLng = delivery?.order?.recipient_lng ?: 47.5079
     val destPoint = GeoPoint(destLat, destLng)
     
-    var driverPoint by remember { mutableStateOf(GeoPoint(destLat - 0.01, destLng - 0.01)) }
+    var driverPoint by remember { mutableStateOf(destPoint) }
 
     LaunchedEffect(delivery) {
-        // Priorité 1 : Position temps réel du livreur (si disponible)
-        val currentLat = delivery?.driver?.current_lat
-        val currentLng = delivery?.driver?.current_lng
+        delivery?.let { del ->
+            // 1. Position actuelle du livreur (Laravel)
+            val currentLat = del.driver?.current_lat
+            val currentLng = del.driver?.current_lng
 
-        if (currentLat != null && currentLng != null && currentLat != 0.0) {
-            driverPoint = GeoPoint(currentLat, currentLng)
-            isDataFresh = true
-        } else {
-            // Priorité 2 : Dernier statut ayant des coordonnées
-            val lastLocation = delivery?.statuses?.filter { it.lat != null && it.lng != null }?.maxByOrNull { it.created_at ?: "" }
-            
-            lastLocation?.let {
-                driverPoint = GeoPoint(it.lat!!, it.lng!!)
+            if (currentLat != null && currentLng != null && currentLat != 0.0) {
+                val newPoint = GeoPoint(currentLat, currentLng)
+                if (newPoint != driverPoint) {
+                    driverPoint = newPoint
+                }
                 isDataFresh = true
+            } else {
+                // Fallback sur le dernier statut connu
+                val lastLocation = del.statuses?.filter { it.lat != null && it.lng != null }?.maxByOrNull { it.created_at ?: "" }
+                lastLocation?.let {
+                    driverPoint = GeoPoint(it.lat!!, it.lng!!)
+                    isDataFresh = true
+                }
             }
+
+            // 2. Tracé réel (Uniquement données Laravel)
+            // On utilise l'historique des statuts pour dessiner le chemin parcouru
+            val history = del.statuses
+                ?.filter { it.lat != null && it.lng != null }
+                ?.sortedBy { it.created_at }
+                ?.map { GeoPoint(it.lat!!, it.lng!!) } ?: emptyList()
+            
+            routePoints = if (isDataFresh) history + driverPoint else history
         }
     }
 
-    // Simulation du temps réel par polling (toutes les 5 secondes)
+    // Simulation du temps réel par polling (toutes les 1 seconde pour une précision maximale)
     LaunchedEffect(Unit) {
         while(true) {
             viewModel.fetchTracking(token, deliveryId)
-            kotlinx.coroutines.delay(5000)
-        }
-    }
-
-    LaunchedEffect(driverPoint, destPoint) {
-        try {
-            val url = "https://router.project-osrm.org/route/v1/driving/${driverPoint.longitude},${driverPoint.latitude};${destPoint.longitude},${destPoint.latitude}?overview=full&geometries=geojson"
-            val response = withContext(Dispatchers.IO) {
-                val connection = URL(url).openConnection() as HttpURLConnection
-                connection.setRequestProperty("User-Agent", "Mozilla/5.0")
-                if (connection.responseCode == HttpURLConnection.HTTP_OK) {
-                    connection.inputStream.bufferedReader().readText()
-                } else null
-            }
-            response?.let {
-                val json = JSONObject(it)
-                if (json.getString("code") == "Ok") {
-                    val routes = json.getJSONArray("routes")
-                    if (routes.length() > 0) {
-                        val geometry = routes.getJSONObject(0).getJSONObject("geometry")
-                        val coords = geometry.getJSONArray("coordinates")
-                        val points = mutableListOf<GeoPoint>()
-                        for (i in 0 until coords.length()) {
-                            val coord = coords.getJSONArray(i)
-                            points.add(GeoPoint(coord.getDouble(1), coord.getDouble(0)))
-                        }
-                        routePoints = points
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            routePoints = listOf(driverPoint, destPoint)
+            kotlinx.coroutines.delay(1000)
         }
     }
 
@@ -163,21 +151,29 @@ fun TrackingScreen(token: String, deliveryId: Int, viewModel: DeliveryViewModel,
                 val destMarker = Marker(mapView)
                 destMarker.position = destPoint
                 destMarker.title = "Destination"
+                destMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                 mapView.overlays.add(destMarker)
                 
-                // Driver Marker
+                // Driver Marker (Livreur)
                 val driverMarker = Marker(mapView)
                 driverMarker.position = driverPoint
                 driverMarker.title = "Livreur"
+                driverMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                // Optionnel: On pourrait mettre une icône de voiture ici
                 mapView.overlays.add(driverMarker)
 
-                // Route Polyline
-                if (routePoints.isNotEmpty()) {
+                // Route Polyline (Tracé Laravel)
+                if (routePoints.size > 1) {
                     val line = Polyline()
                     line.setPoints(routePoints)
                     line.outlinePaint.color = android.graphics.Color.BLUE
-                    line.outlinePaint.strokeWidth = 10f
+                    line.outlinePaint.strokeWidth = 8f
                     mapView.overlays.add(line)
+                }
+                
+                // Centrer la carte sur le livreur s'il bouge
+                if (isDataFresh) {
+                    mapView.controller.animateTo(driverPoint)
                 }
                 
                 mapView.invalidate()
@@ -243,7 +239,7 @@ fun TrackingScreen(token: String, deliveryId: Int, viewModel: DeliveryViewModel,
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
                     Column {
                         Text("Arrivée estimée", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
-                        Text("14:30 - 14:45", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black, color = primaryBlue)
+                        Text(formatTime(delivery?.estimated_arrival), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black, color = primaryBlue)
                     }
                     Surface(
                         color = Color(0xFFDBEAFE),
@@ -252,7 +248,7 @@ fun TrackingScreen(token: String, deliveryId: Int, viewModel: DeliveryViewModel,
                         Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                             Box(modifier = Modifier.size(8.dp).background(Color(0xFF3B82F6), CircleShape))
                             Spacer(modifier = Modifier.width(10.dp))
-                            Text("EN ROUTE", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Black, color = Color(0xFF1E3A8A))
+                            Text(delivery?.status?.uppercase() ?: "EN ROUTE", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Black, color = Color(0xFF1E3A8A))
                         }
                     }
                 }
@@ -272,7 +268,7 @@ fun TrackingScreen(token: String, deliveryId: Int, viewModel: DeliveryViewModel,
                         }
                         Spacer(modifier = Modifier.width(16.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(delivery?.driver?.user?.name ?: "Thomas Dubois", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            Text(delivery?.driver?.user?.name ?: "Chargement...", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text("Livreur", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF64748B))
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -280,11 +276,11 @@ fun TrackingScreen(token: String, deliveryId: Int, viewModel: DeliveryViewModel,
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Icon(Icons.Default.Star, null, modifier = Modifier.size(16.dp), tint = Color(0xFFF59E0B))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("4.9", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
+                                Text(delivery?.driver?.rating?.toString() ?: "0.0", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
                             }
                         }
                         Surface(modifier = Modifier.size(48.dp), shape = CircleShape, color = primaryBlue, onClick = {}) {
-                            Icon(Icons.Default.Call, null, modifier = Modifier.padding(12.dp), tint = Color(0.0f, 0.0f, 0.0f, 1.0f))
+                            Icon(Icons.Default.Call, null, modifier = Modifier.padding(12.dp), tint = Color.White)
                         }
                     }
                 }
@@ -293,8 +289,8 @@ fun TrackingScreen(token: String, deliveryId: Int, viewModel: DeliveryViewModel,
 
                 // Timeline
                 Column {
-                    TimelineRow(time = "10:15", text = "Colis pris en charge", isCompleted = true)
-                    TimelineRow(time = "Actuellement", text = "Prochaine étape : Votre adresse", isCompleted = false, subtitle = delivery?.order?.recipient_address ?: "123 Avenue des Champs-Élysées, Paris")
+                    TimelineRow(time = formatTime(delivery?.picked_up_at), text = "Pris en charge", isCompleted = delivery?.picked_up_at != null)
+                    TimelineRow(time = "Actuellement", text = "Prochaine étape : Votre adresse", isCompleted = false, subtitle = delivery?.order?.recipient_address ?: "Adresse de destination")
                 }
             }
         }

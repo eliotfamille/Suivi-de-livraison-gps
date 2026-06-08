@@ -32,7 +32,8 @@ fun LoginScreen(
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var rememberMe by remember { mutableStateOf(false) }
-    
+
+    val error by viewModel.error.collectAsState()
     val context = LocalContext.current
     val user by viewModel.user.collectAsState()
     
@@ -116,10 +117,11 @@ fun LoginScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = email,
-                        onValueChange = { email = it },
+                        onValueChange = { email = it.replace("\n", "").replace("\r", "") },
                         placeholder = { Text("nom@entreprise.com", color = Color(0xFF94A3B8)) },
                         leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = Color(0xFF64748B)) },
                         modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             unfocusedBorderColor = Color(0xFFE2E8F0),
@@ -137,7 +139,7 @@ fun LoginScreen(
                     }
                     OutlinedTextField(
                         value = password,
-                        onValueChange = { password = it },
+                        onValueChange = { password = it.replace("\n", "").replace("\r", "") },
                         placeholder = { Text("••••••••", color = Color(0xFF94A3B8)) },
                         leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFF64748B)) },
                         trailingIcon = {
@@ -150,6 +152,7 @@ fun LoginScreen(
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
                         shape = RoundedCornerShape(12.dp),
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -168,7 +171,14 @@ fun LoginScreen(
                         )
                         Text("Se souvenir de moi", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF475569))
                     }
-
+                    if (error != null) {
+                        Text(
+                            text = error!!,
+                            color = Color.Red,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
                     Spacer(modifier = Modifier.height(24.dp))
 
                     Button(
@@ -199,7 +209,7 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(maxOf(16.dp, screenHeight * 0.05f)))
             Text(
-                "Système de gestion logistique sécurisé v4.2.0 © 2024\nLogistics Pro International",
+                "Système de gestion logistique\nLogistics Pro",
                 style = MaterialTheme.typography.labelSmall,
                 color = Color(0xFF94A3B8),
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center

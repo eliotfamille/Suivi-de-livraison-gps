@@ -3,14 +3,18 @@ package com.nenykely.front_kotlin.ui.screens.client
 import android.Manifest
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,6 +29,7 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import com.nenykely.front_kotlin.data.models.Delivery
+import com.nenykely.front_kotlin.data.models.User
 import com.nenykely.front_kotlin.viewmodel.DeliveryViewModel
 import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapEventsReceiver
@@ -38,7 +43,7 @@ import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
-fun ClientDeliveriesScreen(token: String, user: com.nenykely.front_kotlin.data.models.User?, viewModel: DeliveryViewModel, onDeliveryClick: (Int) -> Unit) {
+fun ClientDeliveriesScreen(token: String, user: User?, viewModel: DeliveryViewModel, onDeliveryClick: (Int) -> Unit) {
     val deliveries by viewModel.deliveries.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     var selectedTab by remember { mutableStateOf(0) }
@@ -51,6 +56,9 @@ fun ClientDeliveriesScreen(token: String, user: com.nenykely.front_kotlin.data.m
     if (showSubmitDialog) {
         val context = LocalContext.current
         SubmitDeliveryDialog(
+            token = token,
+            viewModel = viewModel,
+            currentUser = user,
             onDismiss = { showSubmitDialog = false },
             onSubmit = { data ->
                 viewModel.submitDelivery(token, data) { result ->
@@ -133,30 +141,39 @@ fun ClientDeliveriesScreen(token: String, user: com.nenykely.front_kotlin.data.m
                 }
             }
 
-            if (isLoading) {
+            if (isLoading && deliveries.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = Color(0xFF0052CC))
                 }
             } else {
-                if (deliveries.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Aucune livraison trouvée", color = Color.Gray)
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        val filteredDeliveries = if (selectedTab == 0) {
-                            deliveries.filter { it.status != "delivered" && it.status != "failed" }
-                        } else {
-                            deliveries.filter { it.status == "delivered" || it.status == "failed" }
+                PullToRefreshBox(
+                    isRefreshing = isLoading,
+                    onRefresh = { viewModel.fetchDeliveries(token) },
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    if (deliveries.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("Aucune livraison trouvée", color = Color.Gray)
                         }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            val filteredDeliveries = if (selectedTab == 0) {
+                                deliveries.filter { it.status != "delivered" && it.status != "failed" }
+                            } else {
+                                deliveries.filter { it.status == "delivered" || it.status == "failed" }
+                            }
 
-                        items(filteredDeliveries) { delivery ->
-                            DeliveryCard(delivery) {
-                                onDeliveryClick(delivery.id)
+                            items(filteredDeliveries) { delivery ->
+                                DeliveryCard(delivery) {
+                                    onDeliveryClick(delivery.id)
+                                }
                             }
                         }
                     }
@@ -167,38 +184,81 @@ fun ClientDeliveriesScreen(token: String, user: com.nenykely.front_kotlin.data.m
 }
 
 @Composable
-fun TabButton(text: String, isSelected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        color = if (isSelected) Color.White else Color.Transparent,
-        shape = RoundedCornerShape(8.dp),
-        shadowElevation = if (isSelected) 2.dp else 0.dp,
-        modifier = modifier
-    ) {
-        Box(modifier = Modifier.padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                color = if (isSelected) Color(0xFF1E293B) else Color(0xFF64748B)
-            )
+fun UserSearchField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    onUserSelected: (User) -> Unit,
+    viewModel: DeliveryViewModel,
+    token: String
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val users by viewModel.users.collectAsState()
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {
+                val sanitized = it.replace("\n", "").replace("\r", "")
+                onValueChange(sanitized)
+                if (sanitized.length >= 2) {
+                    viewModel.searchUsers(token, sanitized)
+                    expanded = true
+                } else {
+                    expanded = false
+                }
+            },
+            label = { Text(label) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            trailingIcon = { Icon(Icons.Default.Search, null) }
+        )
+        if (expanded && users.isNotEmpty()) {
+            Surface(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp),
+                shape = RoundedCornerShape(8.dp),
+                shadowElevation = 8.dp,
+                color = Color.White,
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray)
+            ) {
+                LazyColumn {
+                    items(users) { user ->
+                        ListItem(
+                            headlineContent = { Text(user.name) },
+                            supportingContent = { Text(user.email) },
+                            modifier = Modifier.clickable {
+                                onUserSelected(user)
+                                expanded = false
+                            }
+                        )
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
-fun SubmitDeliveryDialog(onDismiss: () -> Unit, onSubmit: (Map<String, Any?>) -> Unit) {
+fun SubmitDeliveryDialog(
+    token: String,
+    viewModel: DeliveryViewModel,
+    currentUser: User?,
+    onDismiss: () -> Unit,
+    onSubmit: (Map<String, Any?>) -> Unit
+) {
     var description by remember { mutableStateOf("") }
     var weight by remember { mutableStateOf("") }
     var recipientName by remember { mutableStateOf("") }
     var recipientPhone by remember { mutableStateOf("") }
     var recipientAddress by remember { mutableStateOf("") }
-    var senderName by remember { mutableStateOf("") }
-    var senderPhone by remember { mutableStateOf("") }
-    var senderAddress by remember { mutableStateOf("") }
+    var senderName by remember { mutableStateOf(currentUser?.name ?: "") }
+    var senderPhone by remember { mutableStateOf(currentUser?.phone ?: "") }
+    var senderAddress by remember { mutableStateOf(currentUser?.domicile ?: "") }
     
-    var senderGeoPoint by remember { mutableStateOf<GeoPoint?>(null) }
+    var senderGeoPoint by remember { mutableStateOf<GeoPoint?>(
+        if (currentUser?.domicile_lat != null) GeoPoint(currentUser.domicile_lat, currentUser.domicile_lng!!) else null
+    ) }
     var recipientGeoPoint by remember { mutableStateOf<GeoPoint?>(null) }
     
     var showMapFor by remember { mutableStateOf<String?>(null) } // "sender" or "recipient"
@@ -226,20 +286,18 @@ fun SubmitDeliveryDialog(onDismiss: () -> Unit, onSubmit: (Map<String, Any?>) ->
                                 controller.setZoom(12.0)
                                 controller.setCenter(initialPos ?: GeoPoint(-18.8792, 47.5079))
                                 
-                                // Position actuelle (Option A)
                                 val locationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(ctx), this)
                                 locationOverlay.enableMyLocation()
                                 overlays.add(locationOverlay)
 
-                                // Gestion du clic sur la carte (Option B)
                                 val overlay = MapEventsOverlay(object : MapEventsReceiver {
                                     override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
                                         if (showMapFor == "sender") {
                                             senderGeoPoint = p
-                                            senderAddress = "Coordonnées : ${p.latitude}, ${p.longitude}"
+                                            senderAddress = "Position choisie"
                                         } else {
                                             recipientGeoPoint = p
-                                            recipientAddress = "Coordonnées : ${p.latitude}, ${p.longitude}"
+                                            recipientAddress = "Position choisie"
                                         }
                                         invalidate()
                                         return true
@@ -276,63 +334,128 @@ fun SubmitDeliveryDialog(onDismiss: () -> Unit, onSubmit: (Map<String, Any?>) ->
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 item {
                     Text("Expéditeur", fontWeight = FontWeight.Bold)
-                    OutlinedTextField(value = senderName, onValueChange = { senderName = it }, label = { Text("Nom") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = senderPhone, onValueChange = { senderPhone = it }, label = { Text("Téléphone") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone))
-                    OutlinedTextField(
-                        value = senderAddress,
-                        onValueChange = { senderAddress = it },
-                        label = { Text("Adresse de départ (cliquez icône map)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        readOnly = true,
-                        trailingIcon = {
-                            Row {
-                                IconButton(onClick = {
-                                    if (locationPermissionState.status.isGranted) {
-                                        // Option A : GPS position actuelle
-                                        Toast.makeText(context, "Récupération position...", Toast.LENGTH_SHORT).show()
-                                        showMapFor = "sender" // Ouvre la map pour confirmer
-                                    } else {
-                                        locationPermissionState.launchPermissionRequest()
-                                    }
-                                }) {
-                                    Icon(Icons.Default.MyLocation, contentDescription = "Ma position")
-                                }
-                                IconButton(onClick = { showMapFor = "sender" }) {
-                                    Icon(Icons.Default.Map, contentDescription = "Choisir sur la carte")
-                                }
-                            }
-                        }
+                    UserSearchField(
+                        label = "Nom ou Email",
+                        value = senderName,
+                        onValueChange = { senderName = it },
+                        onUserSelected = { u ->
+                            senderName = u.name
+                            senderPhone = u.phone ?: ""
+                            senderAddress = u.domicile ?: ""
+                            if (u.domicile_lat != null) senderGeoPoint = GeoPoint(u.domicile_lat, u.domicile_lng!!)
+                        },
+                        viewModel = viewModel,
+                        token = token
                     )
+                    OutlinedTextField(
+                        value = senderPhone, 
+                        onValueChange = { senderPhone = it.replace("\n", "").replace("\r", "") }, 
+                        label = { Text("Téléphone") }, 
+                        modifier = Modifier.fillMaxWidth(), 
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
+                    )
+                    
+                    Text("Position de départ :", style = MaterialTheme.typography.labelMedium)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilledTonalButton(
+                            onClick = {
+                                if (locationPermissionState.status.isGranted) {
+                                    Toast.makeText(context, "Récupération...", Toast.LENGTH_SHORT).show()
+                                    showMapFor = "sender"
+                                } else locationPermissionState.launchPermissionRequest()
+                            },
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Icon(Icons.Default.MyLocation, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("GPS", fontSize = 12.sp)
+                        }
+                        FilledTonalButton(
+                            onClick = {
+                                currentUser?.domicile_lat?.let { lat ->
+                                    senderGeoPoint = GeoPoint(lat, currentUser.domicile_lng!!)
+                                    senderAddress = currentUser.domicile ?: "Domicile"
+                                    Toast.makeText(context, "Domicile sélectionné", Toast.LENGTH_SHORT).show()
+                                } ?: Toast.makeText(context, "Aucun domicile enregistré", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.weight(1.2f),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Icon(Icons.Default.Home, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Domicile", fontSize = 12.sp)
+                        }
+                        FilledTonalButton(
+                            onClick = { showMapFor = "sender" },
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Icon(Icons.Default.Map, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Carte", fontSize = 12.sp)
+                        }
+                    }
+                    if (senderGeoPoint != null) {
+                        Text("Coordonnées : ${String.format("%.4f", senderGeoPoint!!.latitude)}, ${String.format("%.4f", senderGeoPoint!!.longitude)}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                    }
                 }
                 
                 item {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("Destinataire", fontWeight = FontWeight.Bold)
-                    OutlinedTextField(value = recipientName, onValueChange = { recipientName = it }, label = { Text("Nom") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = recipientPhone, onValueChange = { recipientPhone = it }, label = { Text("Téléphone") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone))
-                    OutlinedTextField(
-                        value = recipientAddress,
-                        onValueChange = { recipientAddress = it },
-                        label = { Text("Adresse de destination (cliquez icône map)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        readOnly = true,
-                        trailingIcon = {
-                            IconButton(onClick = { showMapFor = "recipient" }) {
-                                Icon(Icons.Default.Map, contentDescription = "Choisir sur la carte")
-                            }
-                        }
+                    UserSearchField(
+                        label = "Nom ou Email",
+                        value = recipientName,
+                        onValueChange = { recipientName = it },
+                        onUserSelected = { u ->
+                            recipientName = u.name
+                            recipientPhone = u.phone ?: ""
+                            recipientAddress = u.domicile ?: ""
+                            if (u.domicile_lat != null) recipientGeoPoint = GeoPoint(u.domicile_lat, u.domicile_lng!!)
+                        },
+                        viewModel = viewModel,
+                        token = token
                     )
+                    OutlinedTextField(
+                        value = recipientPhone, 
+                        onValueChange = { recipientPhone = it.replace("\n", "").replace("\r", "") }, 
+                        label = { Text("Téléphone") }, 
+                        modifier = Modifier.fillMaxWidth(), 
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
+                    )
+                    
+                    Text("Position de destination :", style = MaterialTheme.typography.labelMedium)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilledTonalButton(
+                            onClick = { showMapFor = "recipient" },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Map, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Carte")
+                        }
+                    }
                 }
 
                 item {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("Détails du colis", fontWeight = FontWeight.Bold)
-                    OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Description") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(
+                        value = description, 
+                        onValueChange = { description = it.replace("\n", "").replace("\r", "") }, 
+                        label = { Text("Description") }, 
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
                     OutlinedTextField(
                         value = weight,
-                        onValueChange = { weight = it },
+                        onValueChange = { weight = it.replace("\n", "").replace("\r", "") },
                         label = { Text("Poids (kg)") },
                         modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
                 }
@@ -366,6 +489,26 @@ fun SubmitDeliveryDialog(onDismiss: () -> Unit, onSubmit: (Map<String, Any?>) ->
             TextButton(onClick = onDismiss) { Text("Annuler") }
         }
     )
+}
+
+@Composable
+fun TabButton(text: String, isSelected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        color = if (isSelected) Color.White else Color.Transparent,
+        shape = RoundedCornerShape(8.dp),
+        shadowElevation = if (isSelected) 2.dp else 0.dp,
+        modifier = modifier
+    ) {
+        Box(modifier = Modifier.padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                color = if (isSelected) Color(0xFF1E293B) else Color(0xFF64748B)
+            )
+        }
+    }
 }
 
 @Composable

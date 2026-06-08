@@ -18,6 +18,19 @@ class DeliveryRepository {
     suspend fun updateProfile(token: String, body: Map<String, String?>) = 
         api.updateProfile("Bearer $token", body)
 
+    suspend fun updateProfileMultipart(
+        token: String,
+        name: okhttp3.RequestBody?,
+        phone: okhttp3.RequestBody?,
+        domicile: okhttp3.RequestBody?,
+        domicile_lat: okhttp3.RequestBody?,
+        domicile_lng: okhttp3.RequestBody?,
+        avatar: okhttp3.MultipartBody.Part?
+    ) = api.updateProfileMultipart("Bearer $token", name, phone, domicile, domicile_lat, domicile_lng, avatar)
+
+    suspend fun getUsers(token: String, query: String? = null) = 
+        api.getUsers("Bearer $token", query)
+
     suspend fun tracking(identifier: String) = api.tracking(identifier)
 
     suspend fun getDeliveries(token: String) = api.getDeliveries("Bearer $token")

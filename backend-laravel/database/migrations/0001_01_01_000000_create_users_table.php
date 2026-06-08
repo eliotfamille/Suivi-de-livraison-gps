@@ -20,7 +20,11 @@ return new class extends Migration
 
             // NOUVELLES COLONNES AJOUTÉES ICI
             $table->string('domicile')->nullable();
+            $table->decimal('domicile_lat', 10, 7)->nullable();
+            $table->decimal('domicile_lng', 10, 7)->nullable();
             $table->string('bureau')->nullable();
+            $table->decimal('bureau_lat', 10, 7)->nullable();
+            $table->decimal('bureau_lng', 10, 7)->nullable();
             $table->string('fcm_token')->nullable();
 
             $table->timestamp('email_verified_at')->nullable();

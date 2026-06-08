@@ -5,10 +5,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,26 +42,43 @@ fun DriverDeliveriesScreen(token: String, viewModel: DeliveryViewModel, onDelive
             )
         }
     ) { padding ->
-        if (isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        val filteredDeliveries = deliveries.filter { it.status == "pending" || it.status == "assigned" }
+
+        if (isLoading && filteredDeliveries.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding).background(Color(0xFFF8F9FE)),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+            PullToRefreshBox(
+                isRefreshing = isLoading,
+                onRefresh = { viewModel.fetchDeliveries(token) },
+                modifier = Modifier.fillMaxSize().padding(padding).background(Color(0xFFF8F9FE))
             ) {
-                items(deliveries.filter { it.status == "pending" || it.status == "assigned" }) { delivery ->
-                    DriverDeliveryCard(
-                        delivery = delivery,
-                        onAccept = {
-                            viewModel.acceptDelivery(token, delivery.id) {
-                                Toast.makeText(context, "Mission #${delivery.id} acceptée ! Nouveau statut: ASSIGNÉ", Toast.LENGTH_LONG).show()
-                            }
-                        },
-                        onClick = { onDeliveryClick(delivery.id) }
-                    )
+                if (filteredDeliveries.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("Aucune mission disponible", color = Color.Gray)
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        items(filteredDeliveries) { delivery ->
+                            DriverDeliveryCard(
+                                delivery = delivery,
+                                onAccept = {
+                                    viewModel.acceptDelivery(token, delivery.id) {
+                                        Toast.makeText(context, "Mission #${delivery.id} acceptée ! Nouveau statut: ASSIGNÉ", Toast.LENGTH_LONG).show()
+                                    }
+                                },
+                                onClick = { onDeliveryClick(delivery.id) }
+                            )
+                        }
+                    }
                 }
             }
         }

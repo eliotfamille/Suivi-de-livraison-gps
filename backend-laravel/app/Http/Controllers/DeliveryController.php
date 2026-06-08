@@ -88,7 +88,8 @@ class DeliveryController extends Controller
                 'sender_lng'        => $request->sender_lng,
                 'recipient_name'    => $request->recipient_name,
                 'recipient_phone'   => $request->recipient_phone,
-                'recipient_address' => $request->recipient_address . " ($zone)", // Stockage de la zone dans l'adresse
+                'recipient_address' => $request->recipient_address,
+                'zone'              => $zone,
                 'recipient_lat'     => $request->recipient_lat,
                 'recipient_lng'     => $request->recipient_lng,
                 'delivery_fee'      => $fee,
@@ -160,9 +161,12 @@ class DeliveryController extends Controller
     public function updateStatus(Request $request, Delivery $delivery): JsonResponse
     {
         $request->validate([
-            'status' => 'required|string',
+            'status'      => 'required|string',
             'proof_photo' => 'nullable|image|max:2048',
-            'signature' => 'nullable|string', // Base64 signature
+            'signature'   => 'nullable|string', // Base64 signature
+            'latitude'    => 'nullable|numeric',
+            'longitude'   => 'nullable|numeric',
+            'note'        => 'nullable|string',
         ]);
 
         $data = ['status' => $request->status];
@@ -217,8 +221,30 @@ class DeliveryController extends Controller
     public function rate(Request $request, Delivery $delivery): JsonResponse
     {
         $request->validate(['rating' => 'required|integer|min:1|max:5']);
+
+        if ($delivery->status !== 'delivered') {
+            return response()->json(['message' => 'Vous ne pouvez noter qu\'une livraison terminée.'], 422);
+        }
+
+        if ($delivery->rating) {
+            return response()->json(['message' => 'Cette livraison a déjà été notée.'], 422);
+        }
+
         $delivery->update(['rating' => $request->rating]);
-        return response()->json(['message' => 'Merci pour votre note !']);
+
+        // Mise à jour de la note moyenne du livreur
+        if ($delivery->driver) {
+            $driver = $delivery->driver;
+            $newCount = $driver->rating_count + 1;
+            $newRating = (($driver->rating * $driver->rating_count) + $request->rating) / $newCount;
+
+            $driver->update([
+                'rating' => $newRating,
+                'rating_count' => $newCount
+            ]);
+        }
+
+        return response()->json(['message' => 'Merci pour votre note !', 'new_rating' => $delivery->rating]);
     }
 
     /**
@@ -242,11 +268,23 @@ class DeliveryController extends Controller
 
     private function deliveryResource($delivery): array
     {
+        $proofPhotoUrl = null;
+        if ($delivery->proof_photo) {
+            $proofPhotoUrl = filter_var($delivery->proof_photo, FILTER_VALIDATE_URL)
+                ? $delivery->proof_photo
+                : url('storage/' . $delivery->proof_photo);
+        }
+
         return [
             'id'                => $delivery->id,
             'status'            => $delivery->status,
-            'assigned_at'       => $delivery->assigned_at,
-            'created_at'        => $delivery->created_at,
+            'proof_photo'       => $proofPhotoUrl,
+            'signature'         => $delivery->signature, // Base64 usually
+            'assigned_at'       => $delivery->assigned_at?->toIso8601String(),
+            'picked_up_at'      => $delivery->picked_up_at?->toIso8601String(),
+            'delivered_at'      => $delivery->delivered_at?->toIso8601String(),
+            'estimated_arrival' => $delivery->estimated_arrival?->format('H:i'), // Format 14:30
+            'created_at'        => $delivery->created_at?->toIso8601String(),
             'order' => $delivery->order ? [
                 'id'                => $delivery->order->id,
                 'sender_name'       => $delivery->order->sender_name,
@@ -267,7 +305,7 @@ class DeliveryController extends Controller
                 'label'  => $s->label,
                 'lat'    => $s->lat,
                 'lng'    => $s->lng,
-                'created_at' => $s->created_at,
+                'created_at' => $s->created_at?->toIso8601String() ?? $s->occurred_at?->toIso8601String(),
             ]),
             'driver' => $delivery->driver ? [
                 'id'   => $delivery->driver->id,

@@ -43,7 +43,7 @@ fun RegisterScreen(viewModel: AuthViewModel, onRegisterSuccess: () -> Unit, onBa
         }
     }
 
-    BoxWithConstraints(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
@@ -77,7 +77,7 @@ fun RegisterScreen(viewModel: AuthViewModel, onRegisterSuccess: () -> Unit, onBa
                     Text("Nom complet", style = MaterialTheme.typography.labelLarge)
                     OutlinedTextField(
                         value = name,
-                        onValueChange = { name = it },
+                        onValueChange = { name = it.replace("\n", "").replace("\r", "") },
                         placeholder = { Text("Jean Dupont") },
                         leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
                         modifier = Modifier.fillMaxWidth(),
@@ -91,7 +91,7 @@ fun RegisterScreen(viewModel: AuthViewModel, onRegisterSuccess: () -> Unit, onBa
                     Text("Adresse Email", style = MaterialTheme.typography.labelLarge)
                     OutlinedTextField(
                         value = email,
-                        onValueChange = { email = it },
+                        onValueChange = { email = it.replace("\n", "").replace("\r", "") },
                         placeholder = { Text("nom@exemple.com") },
                         leadingIcon = { Icon(Icons.Default.Mail, contentDescription = null) },
                         modifier = Modifier.fillMaxWidth(),
@@ -106,7 +106,7 @@ fun RegisterScreen(viewModel: AuthViewModel, onRegisterSuccess: () -> Unit, onBa
                     Text("Téléphone (Optionnel)", style = MaterialTheme.typography.labelLarge)
                     OutlinedTextField(
                         value = phone,
-                        onValueChange = { phone = it },
+                        onValueChange = { phone = it.replace("\n", "").replace("\r", "") },
                         placeholder = { Text("+261 34 00 000 00") },
                         leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
                         modifier = Modifier.fillMaxWidth(),
@@ -121,7 +121,7 @@ fun RegisterScreen(viewModel: AuthViewModel, onRegisterSuccess: () -> Unit, onBa
                     Text("Mot de passe", style = MaterialTheme.typography.labelLarge)
                     OutlinedTextField(
                         value = password,
-                        onValueChange = { password = it },
+                        onValueChange = { password = it.replace("\n", "").replace("\r", "") },
                         placeholder = { Text("••••••••") },
                         leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                         trailingIcon = {

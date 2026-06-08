@@ -93,13 +93,38 @@ class AuthController extends Controller
         return response()->json($this->userResource($user));
     }
 
+    public function search(Request $request): JsonResponse
+    {
+        $query = $request->query('search');
+        if (!$query) return response()->json([]);
+
+        $users = User::where('name', 'like', "%$query%")
+            ->orWhere('email', 'like', "%$query%")
+            ->limit(10)
+            ->get();
+
+        return response()->json($users->map(fn($u) => $this->userResource($u)));
+    }
+
     public function updateProfile(Request $request): JsonResponse
     {
         $user = $request->user();
         $data = $request->validate([
-            'name'  => 'nullable|string|max:255',
-            'phone' => 'nullable|string|max:20',
+            'name'         => 'nullable|string|max:255',
+            'phone'        => 'nullable|string|max:20',
+            'domicile'     => 'nullable|string|max:255',
+            'domicile_lat' => 'nullable|numeric',
+            'domicile_lng' => 'nullable|numeric',
+            'bureau'       => 'nullable|string|max:255',
+            'bureau_lat'   => 'nullable|numeric',
+            'bureau_lng'   => 'nullable|numeric',
+            'avatar'       => 'nullable|image|max:2048', // Image upload support
         ]);
+
+        if ($request->hasFile('avatar')) {
+            $path = $request->file('avatar')->store('avatars', 'public');
+            $data['avatar'] = $path; // On stocke uniquement le chemin relatif
+        }
 
         $user->update($data);
 
@@ -108,19 +133,37 @@ class AuthController extends Controller
 
     private function userResource(User $user): array
     {
+        $avatarUrl = null;
+        if ($user->avatar) {
+            // Si c'est déjà une URL complète (ex: via un seeder), on la garde
+            if (filter_var($user->avatar, FILTER_VALIDATE_URL)) {
+                $avatarUrl = $user->avatar;
+            } else {
+                // Sinon on génère l'URL complète basée sur l'hôte de la requête actuelle
+                $avatarUrl = url('storage/' . $user->avatar);
+            }
+        }
+
         return [
-            'id'     => $user->id,
-            'name'   => $user->name,
-            'email'  => $user->email,
-            'phone'  => $user->phone,
-            'avatar' => $user->avatar,
-            'roles'  => $user->getRoleNames(),
-            'driver' => $user->driver ? [
+            'id'           => $user->id,
+            'name'         => $user->name,
+            'email'        => $user->email,
+            'phone'        => $user->phone,
+            'avatar'       => $avatarUrl,
+            'domicile'     => $user->domicile,
+            'domicile_lat' => $user->domicile_lat,
+            'domicile_lng' => $user->domicile_lng,
+            'bureau'       => $user->bureau,
+            'bureau_lat'   => $user->bureau_lat,
+            'bureau_lng'   => $user->bureau_lng,
+            'roles'        => $user->getRoleNames(),
+            'driver'       => $user->driver ? [
                 'id'            => $user->driver->id,
                 'status'        => $user->driver->status,
                 'vehicle_type'  => $user->driver->vehicle_type,
                 'vehicle_plate' => $user->driver->vehicle_plate,
-                'rating'        => $user->driver->rating,
+                'rating'        => (float) $user->driver->rating,
+                'rating_count'  => $user->driver->rating_count,
             ] : null,
         ];
     }

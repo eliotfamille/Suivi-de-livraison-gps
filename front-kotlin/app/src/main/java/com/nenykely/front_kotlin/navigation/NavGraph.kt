@@ -88,9 +88,18 @@ fun NavGraph(
             )
         }
         composable(Screen.Home.route) {
-            HomeScreen(onNavigateToDeliveries = {
-                navController.navigate(Screen.Deliveries.route)
-            })
+            token?.let { t ->
+                HomeScreen(
+                    token = t,
+                    viewModel = deliveryViewModel,
+                    onNavigateToDeliveries = {
+                        navController.navigate(Screen.Deliveries.route)
+                    },
+                    onNavigateToTracking = { id ->
+                        navController.navigate(Screen.Tracking.createRoute(id))
+                    }
+                )
+            }
         }
         composable(Screen.Deliveries.route) {
             val user by authViewModel.user.collectAsState()

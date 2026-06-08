@@ -19,6 +19,9 @@ class DeliveryViewModel(private val repository: DeliveryRepository = DeliveryRep
     private val _isLoading = MutableStateFlow(false)
     val isLoading = _isLoading.asStateFlow()
 
+    private val _users = MutableStateFlow<List<User>>(emptyList())
+    val users = _users.asStateFlow()
+
     private val _isSharingLocation = MutableStateFlow(false)
     val isSharingLocation = _isSharingLocation.asStateFlow()
 
@@ -37,6 +40,19 @@ class DeliveryViewModel(private val repository: DeliveryRepository = DeliveryRep
                 android.util.Log.e("DeliveryViewModel", "Exception fetching: ${e.message}")
             } finally {
                 _isLoading.value = false
+            }
+        }
+    }
+
+    fun searchUsers(token: String, query: String) {
+        viewModelScope.launch {
+            try {
+                val response = repository.getUsers(token, query)
+                if (response.isSuccessful) {
+                    _users.value = response.body() ?: emptyList()
+                }
+            } catch (e: Exception) {
+                // Ignore
             }
         }
     }

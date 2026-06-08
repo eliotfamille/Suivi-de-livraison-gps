@@ -20,7 +20,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Auth
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);
-    Route::patch('/auth/profile', [AuthController::class, 'updateProfile']);
+    Route::get('/users', [AuthController::class, 'search']);
+    Route::match(['patch', 'post'], '/auth/profile', [AuthController::class, 'updateProfile']);
 
     // Livraisons
     Route::prefix('deliveries')->group(function () {
@@ -36,7 +37,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Espace Livreur
     Route::prefix('driver')->middleware('role:driver')->group(function () {
         Route::get('/deliveries',   [DriverController::class, 'myDeliveries']);
-        Route::put('/location',     [DriverController::class, 'updateLocationV2']); // Seule route conservée
+        Route::match(['post', 'put'], '/location', [DriverController::class, 'updateLocationV2']);
         Route::patch('/status',     [DriverController::class, 'updateStatus']);
     });
 

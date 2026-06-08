@@ -21,7 +21,8 @@ return new class extends Migration
             $table->decimal('current_lat', 10, 7)->nullable();
             $table->decimal('current_lng', 10, 7)->nullable();
             $table->timestamp('last_location_at')->nullable();
-            $table->decimal('rating', 3, 2)->default(5.00);
+            $table->decimal('rating', 3, 2)->default(0.00);
+            $table->integer('rating_count')->default(0);
             $table->integer('total_deliveries')->default(0);
             $table->timestamps();
         });

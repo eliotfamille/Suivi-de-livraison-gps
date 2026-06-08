@@ -27,6 +27,7 @@ return new class extends Migration
             $table->string('recipient_name');
             $table->string('recipient_phone');
             $table->text('recipient_address');
+            $table->string('zone')->nullable();
             $table->decimal('recipient_lat', 10, 7)->nullable();
             $table->decimal('recipient_lng', 10, 7)->nullable();
 
