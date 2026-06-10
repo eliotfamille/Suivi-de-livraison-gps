@@ -171,6 +171,12 @@ class DeliveryController extends Controller
 
         $data = ['status' => $request->status];
 
+        if ($request->status === 'picked_up') {
+            $data['picked_up_at'] = now();
+        } elseif ($request->status === 'delivered') {
+            $data['delivered_at'] = now();
+        }
+
         if ($request->hasFile('proof_photo')) {
             $path = $request->file('proof_photo')->store('proofs', 'public');
             $data['proof_photo'] = $path;
@@ -184,7 +190,7 @@ class DeliveryController extends Controller
 
         $delivery->statuses()->create([
             'status' => $request->status,
-            'label'  => ucfirst($request->status),
+            'label'  => Delivery::STATUS_LABELS[$request->status] ?? ucfirst($request->status),
             'lat'    => $request->latitude,
             'lng'    => $request->longitude,
             'note'   => $request->note
@@ -283,7 +289,8 @@ class DeliveryController extends Controller
             'assigned_at'       => $delivery->assigned_at?->toIso8601String(),
             'picked_up_at'      => $delivery->picked_up_at?->toIso8601String(),
             'delivered_at'      => $delivery->delivered_at?->toIso8601String(),
-            'estimated_arrival' => $delivery->estimated_arrival?->format('H:i'), // Format 14:30
+            'estimated_arrival' => $delivery->estimated_arrival?->format('H:i'),
+            'rating'            => $delivery->rating,
             'created_at'        => $delivery->created_at?->toIso8601String(),
             'order' => $delivery->order ? [
                 'id'                => $delivery->order->id,
@@ -309,9 +316,20 @@ class DeliveryController extends Controller
             ]),
             'driver' => $delivery->driver ? [
                 'id'   => $delivery->driver->id,
-                'user' => ['name' => $delivery->driver->user->name ?? 'N/A'],
-                'current_lat' => $delivery->driver->current_lat,
-                'current_lng' => $delivery->driver->current_lng,
+                'user' => [
+                    'name' => $delivery->driver->user->name ?? 'N/A',
+                    'avatar' => $delivery->driver->user->avatar ? url('storage/' . $delivery->driver->user->avatar) : null,
+                ],
+                'status'            => $delivery->driver->status,
+                'rating'            => (float) $delivery->driver->rating,
+                'rating_count'      => $delivery->driver->rating_count,
+                'total_deliveries'  => $delivery->driver->total_deliveries,
+                'vehicle_model'     => $delivery->driver->vehicle_model,
+                'vehicle_type'      => $delivery->driver->vehicle_type,
+                'vehicle_plate'     => $delivery->driver->vehicle_plate,
+                'current_lat'       => $delivery->driver->current_lat,
+                'current_lng'       => $delivery->driver->current_lng,
+                'joined_at'         => $delivery->driver->created_at->toIso8601String(),
             ] : null,
         ];
     }

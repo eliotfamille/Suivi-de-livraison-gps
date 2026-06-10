@@ -39,7 +39,10 @@ data class RegisterRequest(
     val phone: String? = null,
     val password: String,
     val password_confirmation: String,
-    val role: String = "client"
+    val role: String = "client",
+    val vehicle_type: String? = null,
+    val vehicle_model: String? = null,
+    val vehicle_plate: String? = null
 )
 
 data class Delivery(
@@ -47,12 +50,15 @@ data class Delivery(
     val order_id: Int,
     val driver_id: Int? = null,
     val status: String,
+    val proof_photo: String? = null,
+    val signature: String? = null,
     val assigned_at: String? = null,
     val picked_up_at: String? = null,
     val delivered_at: String? = null,
     val created_at: String? = null,
     val updated_at: String? = null,
     val estimated_arrival: String? = null,
+    val rating: Int? = null,
     val order: Order? = null,
     val driver: Driver? = null,
     val statuses: List<Status>? = emptyList()
@@ -96,6 +102,8 @@ data class Driver(
     val vehicle_plate: String? = null,
     val rating: Double? = 0.0,
     val rating_count: Int? = 0,
+    val total_deliveries: Int? = 0,
+    val joined_at: String? = null,
     val current_lat: Double? = null,
     val current_lng: Double? = null,
     val user: User? = null
@@ -105,6 +113,7 @@ data class DriverProfile(
     val id: Int,
     val status: String? = null,
     val vehicle_type: String? = null,
+    val vehicle_model: String? = null,
     val vehicle_plate: String? = null,
     val rating: Double? = 0.0,
     val rating_count: Int? = 0

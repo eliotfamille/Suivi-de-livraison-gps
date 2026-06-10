@@ -2,6 +2,8 @@ package com.nenykely.front_kotlin.data
 
 import com.nenykely.front_kotlin.data.api.RetrofitClient
 import com.nenykely.front_kotlin.data.models.*
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.Response
 
 class DeliveryRepository {
@@ -25,8 +27,15 @@ class DeliveryRepository {
         domicile: okhttp3.RequestBody?,
         domicile_lat: okhttp3.RequestBody?,
         domicile_lng: okhttp3.RequestBody?,
+        vehicle_type: okhttp3.RequestBody? = null,
+        vehicle_model: okhttp3.RequestBody? = null,
+        vehicle_plate: okhttp3.RequestBody? = null,
         avatar: okhttp3.MultipartBody.Part?
-    ) = api.updateProfileMultipart("Bearer $token", name, phone, domicile, domicile_lat, domicile_lng, avatar)
+    ) = api.updateProfileMultipart(
+        "Bearer $token", name, phone, domicile, domicile_lat, domicile_lng, 
+        vehicle_type, vehicle_model, vehicle_plate, avatar,
+        "PATCH".toRequestBody("text/plain".toMediaTypeOrNull())
+    )
 
     suspend fun getUsers(token: String, query: String? = null) = 
         api.getUsers("Bearer $token", query)
@@ -43,8 +52,25 @@ class DeliveryRepository {
 
     suspend fun getDelivery(token: String, id: Int) = api.getDelivery("Bearer $token", id)
 
-    suspend fun updateDeliveryStatus(token: String, id: Int, status: String) = 
-        api.updateDeliveryStatus("Bearer $token", id, mapOf("status" to status))
+    suspend fun updateDeliveryStatus(token: String, id: Int, body: Map<String, String?>) = 
+        api.updateDeliveryStatus("Bearer $token", id, body)
+
+    suspend fun updateDeliveryStatusMultipart(
+        token: String,
+        id: Int,
+        status: okhttp3.RequestBody,
+        signature: okhttp3.RequestBody?,
+        lat: okhttp3.RequestBody?,
+        lng: okhttp3.RequestBody?,
+        note: okhttp3.RequestBody?,
+        photo: okhttp3.MultipartBody.Part?
+    ) = api.updateDeliveryStatusMultipart(
+        "Bearer $token", id, status, signature, lat, lng, note, photo,
+        "PATCH".toRequestBody("text/plain".toMediaTypeOrNull())
+    )
+
+    suspend fun rateDelivery(token: String, id: Int, rating: Int) =
+        api.rateDelivery("Bearer $token", id, mapOf("rating" to rating))
 
     suspend fun getDriverDeliveries(token: String) = api.getDriverDeliveries("Bearer $token")
 

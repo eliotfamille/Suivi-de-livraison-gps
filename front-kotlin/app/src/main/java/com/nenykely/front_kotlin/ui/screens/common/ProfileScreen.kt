@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
+import com.nenykely.front_kotlin.data.api.RetrofitClient
 import com.nenykely.front_kotlin.viewmodel.AuthViewModel
 import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapEventsReceiver
@@ -50,7 +51,17 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
     val user by viewModel.user.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val context = LocalContext.current
-    val primaryBlue = Color(0xFF0052CC)
+    val primaryBlue = MaterialTheme.colorScheme.primary
+
+    val getImageUrl: (String?) -> String? = { path ->
+        if (path.isNullOrBlank()) null
+        else if (path.startsWith("http") || path.startsWith("data:image")) path
+        else {
+            val cleanPath = path.removePrefix("/")
+            val finalPath = if (cleanPath.startsWith("storage/")) cleanPath else "storage/$cleanPath"
+            "${RetrofitClient.BASE_URL.removeSuffix("/")}/$finalPath"
+        }
+    }
     
     var showAddressDialog by remember { mutableStateOf<String?>(null) } // "domicile" or "bureau"
     var addressText by remember { mutableStateOf("") }
@@ -60,6 +71,11 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
     var showPersonalDialog by remember { mutableStateOf(false) }
     var editName by remember { mutableStateOf("") }
     var editPhone by remember { mutableStateOf("") }
+
+    var showVehicleDialog by remember { mutableStateOf(false) }
+    var editVehicleType by remember { mutableStateOf("") }
+    var editVehicleModel by remember { mutableStateOf("") }
+    var editVehiclePlate by remember { mutableStateOf("") }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -153,6 +169,51 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
         )
     }
 
+    if (showVehicleDialog) {
+        AlertDialog(
+            onDismissRequest = { showVehicleDialog = false },
+            title = { Text("Modifier le véhicule") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = editVehicleType,
+                        onValueChange = { editVehicleType = it },
+                        label = { Text("Type de véhicule") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = editVehicleModel,
+                        onValueChange = { editVehicleModel = it },
+                        label = { Text("Modèle") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = editVehiclePlate,
+                        onValueChange = { editVehiclePlate = it },
+                        label = { Text("Immatriculation") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    viewModel.updateProfile(
+                        vehicle_type = editVehicleType,
+                        vehicle_model = editVehicleModel,
+                        vehicle_plate = editVehiclePlate
+                    )
+                    showVehicleDialog = false
+                }) { Text("Enregistrer") }
+            },
+            dismissButton = { TextButton(onClick = { showVehicleDialog = false }) { Text("Annuler") } }
+        )
+    }
+
     if (showAddressDialog != null) {
         AlertDialog(
             onDismissRequest = { showAddressDialog = null },
@@ -209,10 +270,10 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
                         "Logistics Pro", 
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Black, 
-                        color = primaryBlue
+                        color = MaterialTheme.colorScheme.primary
                     ) 
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.White)
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         }
     ) { padding ->
@@ -224,7 +285,7 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xFFF8F9FE))
+                    .background(MaterialTheme.colorScheme.background)
                     .verticalScroll(rememberScrollState())
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -234,31 +295,31 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
                     Surface(
                         modifier = Modifier.size(100.dp).clickable { imagePickerLauncher.launch("image/*") },
                         shape = CircleShape,
-                        color = Color(0xFFE2E8F0)
+                        color = MaterialTheme.colorScheme.surfaceVariant
                     ) {
                         if (!user?.avatar.isNullOrEmpty()) {
                             AsyncImage(
-                                model = user?.avatar,
+                                model = getImageUrl(user?.avatar),
                                 contentDescription = "Avatar",
                                 modifier = Modifier.fillMaxSize().clip(CircleShape),
                                 contentScale = ContentScale.Crop
                             )
                         } else {
-                            Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.padding(20.dp), tint = Color(0xFF94A3B8))
+                            Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.padding(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     Surface(
                         modifier = Modifier.size(28.dp).clickable { imagePickerLauncher.launch("image/*") },
                         shape = CircleShape,
-                        color = primaryBlue,
-                        border = androidx.compose.foundation.BorderStroke(2.dp, Color.White)
+                        color = MaterialTheme.colorScheme.primary,
+                        border = androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.surface)
                     ) {
-                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.padding(6.dp), tint = Color.White)
+                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.padding(6.dp), tint = MaterialTheme.colorScheme.onPrimary)
                     }
                 }
                 
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(user?.name ?: "Jean Dupont", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text(user?.name ?: "Jean Dupont", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
 
                 if (user?.isDriver() == true && user?.driver != null) {
                     Row(
@@ -275,11 +336,12 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
                         Text(
                             text = String.format("%.1f", user?.driver?.rating ?: 0.0),
                             fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.bodyLarge
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = " (${user?.driver?.rating_count ?: 0} avis)",
-                            color = Color.Gray,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -292,7 +354,7 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
                 Text(
                     text = if (user?.role != null) roleLabel else "Chargement...",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFF64748B)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 
                 Spacer(modifier = Modifier.height(32.dp))
@@ -304,7 +366,7 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
                     showPersonalDialog = true
                 }) {
                     ProfileItem(icon = Icons.Default.Email, label = "Email", value = user?.email ?: "jean.dupont@email.com")
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color(0xFFF1F5F9))
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
                     ProfileItem(icon = Icons.Default.Phone, label = "Téléphone", value = user?.phone ?: "+33 6 12 34 56 78")
                 }
                 
@@ -319,7 +381,7 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
                             showAddressDialog = "domicile"
                         }
                     )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color(0xFFF1F5F9))
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
                     AddressItem(
                         icon = Icons.Default.Work, 
                         label = "Bureau", 
@@ -331,13 +393,28 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
                         }
                     )
                 }
+
+                if (user?.isDriver() == true && user?.driver != null) {
+                    ProfileSection(title = "DÉTAILS DU VÉHICULE", actionText = "Modifier", onAction = {
+                        editVehicleType = user?.driver?.vehicle_type ?: ""
+                        editVehicleModel = user?.driver?.vehicle_model ?: ""
+                        editVehiclePlate = user?.driver?.vehicle_plate ?: ""
+                        showVehicleDialog = true
+                    }) {
+                        ProfileItem(icon = Icons.Default.Category, label = "Type", value = user?.driver?.vehicle_type ?: "Non renseigné")
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        ProfileItem(icon = Icons.Default.LocalShipping, label = "Modèle", value = user?.driver?.vehicle_model ?: "Non renseigné")
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        ProfileItem(icon = Icons.Default.Badge, label = "Immatriculation", value = user?.driver?.vehicle_plate ?: "Non renseigné")
+                    }
+                }
                 
                 ProfileSection(title = "PRÉFÉRENCES") {
                     val isDarkMode by viewModel.isDarkMode.collectAsState()
                     PreferenceItem(icon = Icons.Default.Notifications, label = "Notifications Push", isChecked = true)
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color(0xFFF1F5F9))
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
                     PreferenceItem(icon = Icons.Default.AlternateEmail, label = "Emails de suivi", isChecked = false)
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color(0xFFF1F5F9))
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
                     PreferenceItem(
                         icon = Icons.Default.DarkMode, 
                         label = "Mode Sombre", 
@@ -355,8 +432,8 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
                     },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(12.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFCA5A5)),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF4444))
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) {
                     Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
@@ -364,7 +441,7 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
                 }
                 
                 Spacer(modifier = Modifier.height(24.dp))
-                Text("Version 2.4.0 (Build 108)", style = MaterialTheme.typography.labelSmall, color = Color(0xFF94A3B8))
+                Text("Version 2.4.0 (Build 108)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.height(32.dp))
             }
         }
@@ -375,20 +452,20 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
 fun ProfileSection(title: String, actionText: String? = null, onAction: () -> Unit = {}, content: @Composable ColumnScope.() -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text(title, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color(0xFF64748B), letterSpacing = 0.5.sp)
+            Text(title, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 0.5.sp)
             if (actionText != null) {
                 TextButton(onClick = onAction) {
-                    Text(actionText, color = Color(0xFF2563EB), fontWeight = FontWeight.Bold)
+                    Text(actionText, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
             }
         }
         Spacer(modifier = Modifier.height(8.dp))
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(16.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0))
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
             Column(content = content)
         }
@@ -401,15 +478,15 @@ fun ProfileItem(icon: ImageVector, label: String, value: String) {
         modifier = Modifier.fillMaxWidth().padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Surface(modifier = Modifier.size(40.dp), shape = RoundedCornerShape(8.dp), color = Color(0xFFEFF6FF)) {
-            Icon(icon, contentDescription = null, modifier = Modifier.padding(8.dp), tint = Color(0xFF3B82F6))
+        Surface(modifier = Modifier.size(40.dp), shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+            Icon(icon, contentDescription = null, modifier = Modifier.padding(8.dp), tint = MaterialTheme.colorScheme.primary)
         }
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = Color(0xFF64748B))
-            Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
         }
-        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = Color(0xFFCBD5E1), modifier = Modifier.size(20.dp))
+        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.size(20.dp))
     }
 }
 
@@ -419,15 +496,15 @@ fun AddressItem(icon: ImageVector, label: String, address: String, onClick: () -
         modifier = Modifier.fillMaxWidth().clickable { onClick() }.padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Surface(modifier = Modifier.size(40.dp), shape = RoundedCornerShape(8.dp), color = Color(0xFFF1F5F9)) {
-            Icon(icon, contentDescription = null, modifier = Modifier.padding(8.dp), tint = Color(0xFF3B82F6))
+        Surface(modifier = Modifier.size(40.dp), shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+            Icon(icon, contentDescription = null, modifier = Modifier.padding(8.dp), tint = MaterialTheme.colorScheme.primary)
         }
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
-            Text(address, style = MaterialTheme.typography.bodyMedium, color = Color(0xFF64748B))
+            Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            Text(address, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Icon(Icons.Default.MoreVert, contentDescription = null, tint = Color(0xFF94A3B8))
+        Icon(Icons.Default.MoreVert, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -437,13 +514,13 @@ fun PreferenceItem(icon: ImageVector, label: String, isChecked: Boolean, onCheck
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = null, tint = Color(0xFF1E293B), modifier = Modifier.size(24.dp))
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
         Spacer(modifier = Modifier.width(16.dp))
-        Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = Color(0xFF1E293B))
+        Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
         Switch(
             checked = isChecked,
             onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Color(0xFF2563EB))
+            colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.onPrimary, checkedTrackColor = MaterialTheme.colorScheme.primary)
         )
     }
 }

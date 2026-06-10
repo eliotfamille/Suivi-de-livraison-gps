@@ -30,12 +30,12 @@ import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(token: String, viewModel: DeliveryViewModel, onNavigateToDeliveries: () -> Unit, onNavigateToTracking: (Int) -> Unit) {
+fun HomeScreen(token: String, viewModel: DeliveryViewModel, onNavigateToDeliveries: () -> Unit, onNavigateToDelivery: (Int, String) -> Unit) {
     val deliveries by viewModel.deliveries.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
-    val primaryBlue = Color(0xFF0052CC)
+    val primaryBlue = MaterialTheme.colorScheme.primary
 
     LaunchedEffect(Unit) {
         viewModel.fetchDeliveries(token)
@@ -55,7 +55,7 @@ fun HomeScreen(token: String, viewModel: DeliveryViewModel, onNavigateToDeliveri
                     ) 
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         }
@@ -68,7 +68,7 @@ fun HomeScreen(token: String, viewModel: DeliveryViewModel, onNavigateToDeliveri
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xFFF8F9FE))
+                    .background(MaterialTheme.colorScheme.background)
                     .padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
@@ -79,14 +79,14 @@ fun HomeScreen(token: String, viewModel: DeliveryViewModel, onNavigateToDeliveri
                         text = "Suivre un colis",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1A1C1E)
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it.replace("\n", "").replace("\r", "") },
-                        placeholder = { Text("Entrez le numéro de suivi...", color = Color.Gray) },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.DarkGray) },
+                        placeholder = { Text("Entrez le numéro de suivi...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                         singleLine = true,
                         trailingIcon = {
                             IconButton(
@@ -97,23 +97,30 @@ fun HomeScreen(token: String, viewModel: DeliveryViewModel, onNavigateToDeliveri
                                     } else {
                                         searchQuery.replace(Regex("[^0-9]"), "").toIntOrNull()
                                     }
-                                    if (id != null) onNavigateToTracking(id)
+                                    
+                                    if (id != null) {
+                                        // On cherche le statut dans la liste locale pour décider de l'écran
+                                        val existing = deliveries.find { it.id == id }
+                                        onNavigateToDelivery(id, existing?.status ?: "pending")
+                                    }
                                 },
                                 modifier = Modifier
                                     .padding(end = 4.dp)
                                     .size(40.dp)
                                     .background(primaryBlue, RoundedCornerShape(8.dp))
                             ) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp))
                             }
                         },
                         modifier = Modifier.fillMaxWidth().height(56.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color.White,
-                            focusedBorderColor = Color(0xFFD1D5DB),
-                            unfocusedBorderColor = Color(0xFFD1D5DB)
+                            focusedContainerColor = MaterialTheme.colorScheme.surface,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                            focusedBorderColor = MaterialTheme.colorScheme.outline,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                         )
                     )
                 }
@@ -124,31 +131,31 @@ fun HomeScreen(token: String, viewModel: DeliveryViewModel, onNavigateToDeliveri
                         text = "En cours de livraison",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF4B5563)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     
                     if (activeDelivery != null) {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                             shape = RoundedCornerShape(20.dp),
-                            onClick = { onNavigateToTracking(activeDelivery.id) }
+                            onClick = { onNavigateToDelivery(activeDelivery.id, activeDelivery.status) }
                         ) {
                             Column(modifier = Modifier.padding(20.dp)) {
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                     Surface(
-                                        color = Color(0xFFD1FAE5),
+                                        color = MaterialTheme.colorScheme.secondaryContainer,
                                         shape = RoundedCornerShape(8.dp)
                                     ) {
                                         Row(
                                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Icon(Icons.Default.LocalShipping, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color(0xFF059669))
+                                            Icon(Icons.Default.LocalShipping, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
                                             Spacer(modifier = Modifier.width(6.dp))
-                                            Text(activeDelivery.status, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color(0xFF059669))
+                                            Text(activeDelivery.status, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
                                         }
                                     }
                                     
@@ -156,30 +163,30 @@ fun HomeScreen(token: String, viewModel: DeliveryViewModel, onNavigateToDeliveri
                                         modifier = Modifier
                                             .size(70.dp)
                                             .clip(RoundedCornerShape(12.dp))
-                                            .background(Color(0xFFF3F4F6)),
+                                            .background(MaterialTheme.colorScheme.surfaceVariant),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Icon(Icons.Default.Inventory2, contentDescription = null, tint = Color(0xFF9CA3AF), modifier = Modifier.size(32.dp))
+                                        Icon(Icons.Default.Inventory2, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(32.dp))
                                     }
                                 }
                                 
-                                Text(text = "Colis #FR-${activeDelivery.id}X", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color(0xFF111827))
+                                Text(text = "Colis #FR-${activeDelivery.id}X", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                 
                                 Spacer(modifier = Modifier.height(20.dp))
                                 
-                                Text("LIVRAISON ESTIMÉE", style = MaterialTheme.typography.labelMedium, color = Color(0xFF6B7280), letterSpacing = 0.5.sp)
+                                Text("LIVRAISON ESTIMÉE", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 0.5.sp)
                                 Text(activeDelivery.estimated_arrival ?: "Prochainement", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = primaryBlue)
                             }
                         }
                     } else {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                             shape = RoundedCornerShape(20.dp),
-                            border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Box(modifier = Modifier.padding(40.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                Text("Aucune livraison en cours", color = Color.Gray)
+                                Text("Aucune livraison en cours", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -188,42 +195,42 @@ fun HomeScreen(token: String, viewModel: DeliveryViewModel, onNavigateToDeliveri
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                         shape = RoundedCornerShape(20.dp),
-                        border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                     ) {
                         Column {
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(180.dp)
-                                    .background(Color(0xFFE0F2FE))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
                             ) {
-                                Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.fillMaxSize().alpha(0.05f), tint = primaryBlue)
+                                Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.fillMaxSize().alpha(0.1f), tint = primaryBlue)
                                 
                                 Box(modifier = Modifier.align(Alignment.Center)) {
                                     Box(modifier = Modifier.align(Alignment.TopCenter).offset(y = (-20).dp)) {
-                                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(60.dp))
+                                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(60.dp))
                                     }
                                     Surface(
                                         modifier = Modifier.size(36.dp),
                                         shape = CircleShape,
                                         color = primaryBlue,
                                         shadowElevation = 4.dp,
-                                        border = BorderStroke(2.dp, Color.White)
+                                        border = BorderStroke(2.dp, MaterialTheme.colorScheme.surface)
                                     ) {
-                                        Icon(Icons.Default.DirectionsCar, contentDescription = null, tint = Color.White, modifier = Modifier.padding(6.dp))
+                                        Icon(Icons.Default.DirectionsCar, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.padding(6.dp))
                                     }
                                 }
                             }
                             
                             Column(modifier = Modifier.padding(20.dp)) {
-                                Text("VOS LIVRAISONS", style = MaterialTheme.typography.labelSmall, color = Color(0xFF6B7280), letterSpacing = 0.5.sp)
+                                Text("VOS LIVRAISONS", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 0.5.sp)
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.List, contentDescription = null, tint = primaryBlue, modifier = Modifier.size(18.dp))
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Historique et suivi complet", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color(0xFF111827))
+                                    Text("Historique et suivi complet", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                 }
                                 
                                 Spacer(modifier = Modifier.height(20.dp))
@@ -232,8 +239,8 @@ fun HomeScreen(token: String, viewModel: DeliveryViewModel, onNavigateToDeliveri
                                     onClick = onNavigateToDeliveries,
                                     modifier = Modifier.fillMaxWidth().height(48.dp),
                                     shape = RoundedCornerShape(12.dp),
-                                    border = BorderStroke(1.dp, Color(0xFFD1D5DB)),
-                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF374151))
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
                                 ) {
                                     Text("Gérer mes colis", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                                 }

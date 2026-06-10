@@ -18,7 +18,10 @@ class AuthController extends Controller
             'email'    => 'required|email|unique:users',
             'phone'    => 'nullable|string|max:20',
             'password' => 'required|min:8|confirmed',
-            'role'     => 'nullable|string|in:client,driver'
+            'role'     => 'nullable|string|in:client,driver',
+            'vehicle_type'  => 'nullable|string',
+            'vehicle_model' => 'nullable|string',
+            'vehicle_plate' => 'nullable|string',
         ]);
 
         $role = $request->role ?? 'client';
@@ -33,11 +36,13 @@ class AuthController extends Controller
 
             $user->assignRole($role);
 
-            // Si c'est un livreur, on crée son profil Driver
+            // Si c'est un livreur, on crée son profil Driver avec les infos fournies
             if ($role === 'driver') {
                 $user->driver()->create([
-                    'status' => 'available',
-                    'vehicle_type' => 'motorcycle', // Valeur par défaut
+                    'status'        => 'available',
+                    'vehicle_type'  => $data['vehicle_type'] ?? 'motorcycle',
+                    'vehicle_model' => $data['vehicle_model'] ?? null,
+                    'vehicle_plate' => $data['vehicle_plate'] ?? null,
                 ]);
             }
 
@@ -118,6 +123,9 @@ class AuthController extends Controller
             'bureau'       => 'nullable|string|max:255',
             'bureau_lat'   => 'nullable|numeric',
             'bureau_lng'   => 'nullable|numeric',
+            'vehicle_type'  => 'nullable|string',
+            'vehicle_model' => 'nullable|string',
+            'vehicle_plate' => 'nullable|string',
             'avatar'       => 'nullable|image|max:2048', // Image upload support
         ]);
 
@@ -127,6 +135,18 @@ class AuthController extends Controller
         }
 
         $user->update($data);
+
+        // Si l'utilisateur est un livreur, on met aussi à jour son profil Driver
+        if ($user->driver) {
+            $driverData = [];
+            if ($request->has('vehicle_type')) $driverData['vehicle_type'] = $request->vehicle_type;
+            if ($request->has('vehicle_model')) $driverData['vehicle_model'] = $request->vehicle_model;
+            if ($request->has('vehicle_plate')) $driverData['vehicle_plate'] = $request->vehicle_plate;
+
+            if (!empty($driverData)) {
+                $user->driver->update($driverData);
+            }
+        }
 
         return response()->json($this->userResource($user));
     }

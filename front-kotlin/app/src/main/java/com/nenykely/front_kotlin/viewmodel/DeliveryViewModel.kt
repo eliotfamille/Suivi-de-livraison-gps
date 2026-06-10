@@ -8,6 +8,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+import java.io.File
 
 class DeliveryViewModel(private val repository: DeliveryRepository = DeliveryRepository()) : ViewModel() {
     private val _deliveries = MutableStateFlow<List<Delivery>>(emptyList())
@@ -25,19 +31,32 @@ class DeliveryViewModel(private val repository: DeliveryRepository = DeliveryRep
     private val _isSharingLocation = MutableStateFlow(false)
     val isSharingLocation = _isSharingLocation.asStateFlow()
 
+    private val _proofPhoto = MutableStateFlow<File?>(null)
+    val proofPhoto = _proofPhoto.asStateFlow()
+
+    private val _error = MutableStateFlow<String?>(null)
+    val error = _error.asStateFlow()
+
+    private var lastLat: Double? = null
+    private var lastLng: Double? = null
+
+    fun setProofPhoto(file: File?) {
+        _proofPhoto.value = file
+    }
+
     fun fetchDeliveries(token: String) {
+        if (token.isBlank()) return
         viewModelScope.launch {
             _isLoading.value = true
             try {
                 val response = repository.getDeliveries(token)
                 if (response.isSuccessful) {
                     _deliveries.value = response.body() ?: emptyList()
-                    android.util.Log.d("DeliveryViewModel", "Fetched ${_deliveries.value.size} deliveries")
-                } else {
-                    android.util.Log.e("DeliveryViewModel", "Error fetching deliveries: ${response.code()}")
+                } else if (response.code() == 401) {
+                    _error.value = "Session expirée"
                 }
             } catch (e: Exception) {
-                android.util.Log.e("DeliveryViewModel", "Exception fetching: ${e.message}")
+                android.util.Log.e("DeliveryViewModel", "Fetch error: ${e.message}")
             } finally {
                 _isLoading.value = false
             }
@@ -52,128 +71,163 @@ class DeliveryViewModel(private val repository: DeliveryRepository = DeliveryRep
                     _users.value = response.body() ?: emptyList()
                 }
             } catch (e: Exception) {
-                // Ignore
+                android.util.Log.e("DeliveryViewModel", "Search error: ${e.message}")
             }
         }
     }
 
     fun fetchTracking(token: String, deliveryId: Int) {
         viewModelScope.launch {
+            _isLoading.value = true
             try {
                 val response = repository.getDelivery(token, deliveryId)
                 if (response.isSuccessful) {
                     _currentDelivery.value = response.body()
                 }
             } catch (e: Exception) {
-                // Handle error
-            }
-        }
-    }
-
-    fun submitDelivery(token: String, data: Map<String, Any?>, onTestResult: (String) -> Unit = {}) {
-        viewModelScope.launch {
-            _isLoading.value = true
-            try {
-                // LOG ÉTAPE 1 : Envoi par Kotlin
-                android.util.Log.d("TEST_COMM", "ÉTAPE 1 : Kotlin envoie -> $data")
-                
-                val request = StoreDeliveryRequest(
-                    description = data["description"] as? String ?: "",
-                    weight_kg = (data["weight_kg"] as? Double) ?: 0.0,
-                    recipient_name = data["recipient_name"] as? String ?: "",
-                    recipient_phone = data["recipient_phone"] as? String ?: "",
-                    recipient_address = data["recipient_address"] as? String ?: "",
-                    recipient_lat = (data["recipient_lat"] as? Double) ?: 0.0,
-                    recipient_lng = (data["recipient_lng"] as? Double) ?: 0.0,
-                    sender_name = data["sender_name"] as? String ?: "",
-                    sender_phone = data["sender_phone"] as? String ?: "",
-                    sender_address = data["sender_address"] as? String ?: "",
-                    sender_lat = (data["sender_lat"] as? Double) ?: 0.0,
-                    sender_lng = (data["sender_lng"] as? Double) ?: 0.0
-                )
-                
-                val response = repository.storeDelivery(token, request)
-                if (response.isSuccessful) {
-                    val body = response.body()
-                    val msg = body?.message ?: "Succès sans message"
-                    
-                    // LOG ÉTAPE 5 : Retour dans Kotlin
-                    android.util.Log.d("TEST_COMM", "ÉTAPE 5 : Kotlin a reçu réponse -> $msg")
-                    onTestResult(msg)
-                    
-                    fetchDeliveries(token)
-                } else {
-                    val error = response.errorBody()?.string()
-                    android.util.Log.e("TEST_COMM", "ERREUR ÉTAPE 2/3 : $error")
-                    onTestResult("Erreur Serveur : $error")
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("TEST_COMM", "ERREUR CRITIQUE : ${e.message}")
-                onTestResult("Crash : ${e.message}")
+                android.util.Log.e("DeliveryViewModel", "Tracking error: ${e.message}")
             } finally {
                 _isLoading.value = false
             }
         }
     }
 
-    fun acceptDelivery(token: String, deliveryId: Int, onSuccess: () -> Unit = {}) {
+    fun submitDelivery(token: String, data: Map<String, Any?>, onResult: (String) -> Unit) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val req = StoreDeliveryRequest(
+                    description = data["description"] as String,
+                    weight_kg = data["weight_kg"] as Double,
+                    recipient_name = data["recipient_name"] as String,
+                    recipient_phone = data["recipient_phone"] as String,
+                    recipient_address = data["recipient_address"] as String,
+                    recipient_lat = data["recipient_lat"] as Double,
+                    recipient_lng = data["recipient_lng"] as Double,
+                    sender_name = data["sender_name"] as String,
+                    sender_phone = data["sender_phone"] as String,
+                    sender_address = data["sender_address"] as String,
+                    sender_lat = data["sender_lat"] as Double,
+                    sender_lng = data["sender_lng"] as Double
+                )
+                val response = repository.storeDelivery(token, req)
+                if (response.isSuccessful) {
+                    fetchDeliveries(token)
+                    onResult("Livraison enregistrée avec succès")
+                } else {
+                    onResult("Erreur lors de l'enregistrement: ${response.code()}")
+                }
+            } catch (e: Exception) {
+                onResult("Erreur de connexion: ${e.message}")
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun acceptDelivery(token: String, deliveryId: Int, onSuccess: () -> Unit) {
         viewModelScope.launch {
             try {
-                android.util.Log.d("DELIVERY_TEST", "TENTATIVE : Acceptation de la livraison #$deliveryId")
                 val response = repository.acceptDelivery(token, deliveryId)
                 if (response.isSuccessful) {
-                    _currentDelivery.value = response.body()
-                    android.util.Log.d("DELIVERY_TEST", "SUCCÈS : Livraison #$deliveryId acceptée. Nouveau statut: ${_currentDelivery.value?.status}")
+                    fetchDeliveries(token)
                     onSuccess()
                 } else {
-                    android.util.Log.e("DELIVERY_TEST", "ERREUR : Échec acceptation #${deliveryId}. Code: ${response.code()}")
+                    android.util.Log.e("DELIVERY_TEST", "Error accept: ${response.code()}")
+                    if (response.code() == 401) _error.value = "Erreur d'authentification (401)"
                 }
             } catch (e: Exception) {
-                android.util.Log.e("DELIVERY_TEST", "CRASH acceptDelivery: ${e.message}")
+                android.util.Log.e("DELIVERY_TEST", "Exception acceptDelivery: ${e.message}")
             }
         }
     }
 
-    fun updateStatus(token: String, deliveryId: Int, status: String, onSuccess: () -> Unit = {}) {
+    fun updateStatus(
+        token: String, 
+        deliveryId: Int, 
+        status: String, 
+        lat: Double? = null,
+        lng: Double? = null,
+        photoFile: File? = null,
+        signatureBase64: String? = null,
+        onSuccess: () -> Unit = {}
+    ) {
+        val finalLat = lat ?: lastLat
+        val finalLng = lng ?: lastLng
+
         viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
             try {
-                android.util.Log.d("DELIVERY_TEST", "TENTATIVE : Mise à jour statut livraison #$deliveryId vers -> $status")
-                val response = repository.updateDeliveryStatus(token, deliveryId, status)
+                val response = if (photoFile != null || !signatureBase64.isNullOrBlank()) {
+                    val statusRB = status.toRequestBody("text/plain".toMediaTypeOrNull())
+                    val latRB = finalLat?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
+                    val lngRB = finalLng?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
+                    val noteRB = "Mise à jour via application".toRequestBody("text/plain".toMediaTypeOrNull())
+                    
+                    // ON ENVOIE LA SIGNATURE EN TANT QUE STRING (Base64) car le serveur l'exige
+                    val signatureRB = signatureBase64?.toRequestBody("text/plain".toMediaTypeOrNull())
+
+                    val photoPart = photoFile?.let {
+                        MultipartBody.Part.createFormData(
+                            "proof_photo", it.name,
+                            it.asRequestBody("image/*".toMediaTypeOrNull())
+                        )
+                    }
+                    
+                    repository.updateDeliveryStatusMultipart(token, deliveryId, statusRB, signatureRB, latRB, lngRB, noteRB, photoPart)
+                } else {
+                    val body = mutableMapOf<String, String?>(
+                        "status" to status,
+                        "lat" to finalLat?.toString(),
+                        "lng" to finalLng?.toString()
+                    )
+                    repository.updateDeliveryStatus(token, deliveryId, body)
+                }
+                
                 if (response.isSuccessful) {
                     _currentDelivery.value = response.body()
-                    android.util.Log.d("DELIVERY_TEST", "SUCCÈS : Nouveau statut pour #$deliveryId est: ${_currentDelivery.value?.status}")
                     onSuccess()
-                    
-                    // Start/Stop location sharing based on status
-                    if (status == "in_transit") {
-                        startLocationSharing(token)
-                    } else if (status == "delivered" || status == "failed") {
-                        stopLocationSharing()
-                    }
                 } else {
-                    android.util.Log.e("DELIVERY_TEST", "ERREUR : Échec mise à jour statut #${deliveryId}. Code: ${response.code()}")
+                    val errorBody = response.errorBody()?.string()
+                    android.util.Log.e("DELIVERY_ERROR", "Code ${response.code()}: $errorBody")
+                    _error.value = "Erreur ${response.code()}: Vérifiez la validation serveur"
                 }
             } catch (e: Exception) {
-                android.util.Log.e("DELIVERY_TEST", "CRASH updateStatus: ${e.message}")
+                _error.value = "Erreur connexion"
+            } finally {
+                _isLoading.value = false
             }
         }
     }
 
-    private fun startLocationSharing(token: String) {
-        if (_isSharingLocation.value) return
-        _isSharingLocation.value = true
-        
+    fun rateDelivery(token: String, deliveryId: Int, rating: Int, onSuccess: () -> Unit = {}) {
         viewModelScope.launch {
-            while (_isSharingLocation.value) {
-                // Simulation d'envoi de position GPS
-                // En production, on utiliserait FusedLocationProviderClient
-                repository.updateDriverLocation(token, -18.8792 + (Math.random() - 0.5) * 0.01, 47.5079 + (Math.random() - 0.5) * 0.01)
-                delay(10000) // Toutes les 10 secondes
+            _isLoading.value = true
+            try {
+                val response = repository.rateDelivery(token, deliveryId, rating)
+                if (response.isSuccessful) {
+                    fetchTracking(token, deliveryId)
+                    onSuccess()
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("DELIVERY_TEST", "Erreur rating: ${e.message}")
+            } finally {
+                _isLoading.value = false
             }
         }
     }
 
-    fun stopLocationSharing() {
-        _isSharingLocation.value = false
+    fun updateLocation(token: String, lat: Double, lng: Double) {
+        if (token.isBlank() || lat == 0.0) return
+        lastLat = lat
+        lastLng = lng
+        viewModelScope.launch {
+            try {
+                repository.updateDriverLocation(token, lat, lng)
+            } catch (e: Exception) {
+                android.util.Log.e("DeliveryViewModel", "Location update error")
+            }
+        }
     }
 }

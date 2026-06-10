@@ -43,7 +43,7 @@ import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
-fun ClientDeliveriesScreen(token: String, user: User?, viewModel: DeliveryViewModel, onDeliveryClick: (Int) -> Unit) {
+fun ClientDeliveriesScreen(token: String, user: User?, viewModel: DeliveryViewModel, onDeliveryClick: (Delivery) -> Unit) {
     val deliveries by viewModel.deliveries.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     var selectedTab by remember { mutableStateOf(0) }
@@ -77,29 +77,29 @@ fun ClientDeliveriesScreen(token: String, user: User?, viewModel: DeliveryViewMo
                         "Logistics Pro", 
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Black, 
-                        color = Color(0xFF0052CC)
+                        color = MaterialTheme.colorScheme.primary
                     ) 
                 },
                 navigationIcon = {
                     IconButton(onClick = {}) {
-                        Icon(Icons.Default.Menu, contentDescription = null, tint = Color(0xFF1A1C1E))
+                        Icon(Icons.Default.Menu, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
                     }
                 },
                 actions = {
                     IconButton(onClick = { /* Profile */ }) {
-                        Surface(modifier = Modifier.size(32.dp), shape = androidx.compose.foundation.shape.CircleShape, color = Color(0xFFDBEAFE)) {
-                            Icon(Icons.Default.Person, contentDescription = "Profil", modifier = Modifier.padding(4.dp), tint = Color(0xFF3B82F6))
+                        Surface(modifier = Modifier.size(32.dp), shape = androidx.compose.foundation.shape.CircleShape, color = MaterialTheme.colorScheme.surfaceVariant) {
+                            Icon(Icons.Default.Person, contentDescription = "Profil", modifier = Modifier.padding(4.dp), tint = MaterialTheme.colorScheme.primary)
                         }
                     }
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.White)
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showSubmitDialog = true },
-                containerColor = Color(0xFF0052CC),
-                contentColor = Color.White
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Nouvelle livraison")
             }
@@ -109,19 +109,19 @@ fun ClientDeliveriesScreen(token: String, user: User?, viewModel: DeliveryViewMo
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(Color(0xFFF8F9FE))
+                .background(MaterialTheme.colorScheme.background)
         ) {
             Text(
                 text = "Mes livraisons",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(16.dp),
-                color = Color(0xFF111827)
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             // Tabs Styling
             Surface(
-                color = Color(0xFFF1F5F9),
+                color = MaterialTheme.colorScheme.surfaceVariant,
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
             ) {
@@ -143,7 +143,7 @@ fun ClientDeliveriesScreen(token: String, user: User?, viewModel: DeliveryViewMo
 
             if (isLoading && deliveries.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Color(0xFF0052CC))
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             } else {
                 PullToRefreshBox(
@@ -156,7 +156,7 @@ fun ClientDeliveriesScreen(token: String, user: User?, viewModel: DeliveryViewMo
                             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("Aucune livraison trouvée", color = Color.Gray)
+                            Text("Aucune livraison trouvée", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     } else {
                         LazyColumn(
@@ -172,7 +172,7 @@ fun ClientDeliveriesScreen(token: String, user: User?, viewModel: DeliveryViewMo
 
                             items(filteredDeliveries) { delivery ->
                                 DeliveryCard(delivery) {
-                                    onDeliveryClick(delivery.id)
+                                    onDeliveryClick(delivery)
                                 }
                             }
                         }
@@ -495,7 +495,7 @@ fun SubmitDeliveryDialog(
 fun TabButton(text: String, isSelected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        color = if (isSelected) Color.White else Color.Transparent,
+        color = if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent,
         shape = RoundedCornerShape(8.dp),
         shadowElevation = if (isSelected) 2.dp else 0.dp,
         modifier = modifier
@@ -505,7 +505,7 @@ fun TabButton(text: String, isSelected: Boolean, modifier: Modifier = Modifier, 
                 text = text,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                color = if (isSelected) Color(0xFF1E293B) else Color(0xFF64748B)
+                color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -516,16 +516,16 @@ fun DeliveryCard(delivery: Delivery, onClick: () -> Unit) {
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         shape = RoundedCornerShape(12.dp)
     ) {
         Box(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
             val (accentColor, statusLabel, statusIcon) = when (delivery.status) {
-                "in_transit", "picked_up", "assigned" -> Triple(Color(0xFF2563EB), "En route", Icons.Default.LocalShipping)
+                "in_transit", "picked_up", "assigned" -> Triple(MaterialTheme.colorScheme.primary, "En route", Icons.Default.LocalShipping)
                 "pending" -> Triple(Color(0xFFD97706), "En attente", Icons.Default.HourglassEmpty)
                 "delivered" -> Triple(Color(0xFF059669), "Livré", Icons.Default.CheckCircle)
-                else -> Triple(Color(0xFFDC2626), "Retardé", Icons.Default.ErrorOutline)
+                else -> Triple(MaterialTheme.colorScheme.error, "Retardé", Icons.Default.ErrorOutline)
             }
             
             Box(
@@ -542,14 +542,14 @@ fun DeliveryCard(delivery: Delivery, onClick: () -> Unit) {
                         Text(
                             "NUMÉRO DE SUIVI", 
                             style = MaterialTheme.typography.labelSmall, 
-                            color = Color(0xFF64748B),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             letterSpacing = 0.5.sp
                         )
                         Text(
                             "FR-${8000+delivery.id}-X", 
                             style = MaterialTheme.typography.titleLarge, 
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF0F172A)
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                     
@@ -576,25 +576,38 @@ fun DeliveryCard(delivery: Delivery, onClick: () -> Unit) {
                 Spacer(modifier = Modifier.height(20.dp))
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.LocationOn, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         delivery.order?.recipient_address ?: "Adresse non renseignée", 
                         style = MaterialTheme.typography.bodyLarge, 
-                        color = Color(0xFF475569)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 
                 Spacer(modifier = Modifier.height(10.dp))
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Schedule, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         "Dernière mise à jour : Récemment",
                         style = MaterialTheme.typography.bodyLarge, 
-                        color = Color(0xFF475569)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+
+                if (delivery.driver != null) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            "Livreur : ${delivery.driver?.user?.name ?: "Assigné"}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }

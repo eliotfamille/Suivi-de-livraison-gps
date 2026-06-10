@@ -65,6 +65,7 @@ class AuthViewModel(private val repository: DeliveryRepository = DeliveryReposit
     fun logout() {
         _user.value = null
         _token.value = null
+        _error.value = null
     }
 
     fun fetchProfile() {
@@ -93,6 +94,9 @@ class AuthViewModel(private val repository: DeliveryRepository = DeliveryReposit
         bureau: String? = null,
         bureau_lat: Double? = null,
         bureau_lng: Double? = null,
+        vehicle_type: String? = null,
+        vehicle_model: String? = null,
+        vehicle_plate: String? = null,
         imageFile: File? = null
     ) {
         val currentToken = _token.value ?: return
@@ -105,6 +109,9 @@ class AuthViewModel(private val repository: DeliveryRepository = DeliveryReposit
                     val domicilePart = domicile?.toRequestBody("text/plain".toMediaTypeOrNull())
                     val latPart = domicile_lat?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
                     val lngPart = domicile_lng?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
+                    val vtPart = vehicle_type?.toRequestBody("text/plain".toMediaTypeOrNull())
+                    val vmPart = vehicle_model?.toRequestBody("text/plain".toMediaTypeOrNull())
+                    val vpPart = vehicle_plate?.toRequestBody("text/plain".toMediaTypeOrNull())
                     
                     val imagePart = MultipartBody.Part.createFormData(
                         "avatar",
@@ -113,7 +120,8 @@ class AuthViewModel(private val repository: DeliveryRepository = DeliveryReposit
                     )
                     
                     repository.updateProfileMultipart(
-                        currentToken, namePart, phonePart, domicilePart, latPart, lngPart, imagePart
+                        currentToken, namePart, phonePart, domicilePart, latPart, lngPart, 
+                        vtPart, vmPart, vpPart, imagePart
                     )
                 } else {
                     val body = mutableMapOf<String, String?>()
@@ -125,6 +133,9 @@ class AuthViewModel(private val repository: DeliveryRepository = DeliveryReposit
                     bureau?.let { body["bureau"] = it }
                     bureau_lat?.let { body["bureau_lat"] = it.toString() }
                     bureau_lng?.let { body["bureau_lng"] = it.toString() }
+                    vehicle_type?.let { body["vehicle_type"] = it }
+                    vehicle_model?.let { body["vehicle_model"] = it }
+                    vehicle_plate?.let { body["vehicle_plate"] = it }
                     repository.updateProfile(currentToken, body)
                 }
 
@@ -141,7 +152,17 @@ class AuthViewModel(private val repository: DeliveryRepository = DeliveryReposit
         }
     }
 
-    fun register(name: String, email: String, password: String, phone: String?, role: String = "client", onSuccess: () -> Unit) {
+    fun register(
+        name: String, 
+        email: String, 
+        password: String, 
+        phone: String?, 
+        role: String = "client",
+        vehicleType: String? = null,
+        vehicleModel: String? = null,
+        vehiclePlate: String? = null,
+        onSuccess: () -> Unit
+    ) {
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
@@ -153,7 +174,10 @@ class AuthViewModel(private val repository: DeliveryRepository = DeliveryReposit
                         password = password,
                         password_confirmation = password,
                         phone = if (phone.isNullOrBlank()) null else phone,
-                        role = role
+                        role = role,
+                        vehicle_type = vehicleType,
+                        vehicle_model = vehicleModel,
+                        vehicle_plate = vehiclePlate
                     )
                 )
                 if (response.isSuccessful) {

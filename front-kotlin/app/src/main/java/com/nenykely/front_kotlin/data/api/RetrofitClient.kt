@@ -1,5 +1,6 @@
 package com.nenykely.front_kotlin.data.api
 
+import com.google.gson.GsonBuilder
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -10,7 +11,7 @@ object RetrofitClient {
     private const val EMULATOR_IP = "10.0.2.2"
     private const val PORT = "8000"
 
-    private val BASE_URL: String by lazy {
+    val BASE_URL: String by lazy {
         if (isEmulator()) "http://$EMULATOR_IP:$PORT/" else "$NGROK_URL/"
     }
 
@@ -37,10 +38,14 @@ object RetrofitClient {
         .addInterceptor(logging)
         .build()
 
+    private val gson = GsonBuilder()
+        .setLenient()
+        .create()
+
     val instance: ApiService by lazy {
         val retrofit = Retrofit.Builder()
             .baseUrl(BASE_URL)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(GsonConverterFactory.create(gson))
             .client(httpClient)
             .build()
 

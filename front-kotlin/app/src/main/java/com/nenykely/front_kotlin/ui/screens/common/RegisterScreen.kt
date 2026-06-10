@@ -32,6 +32,11 @@ fun RegisterScreen(viewModel: AuthViewModel, onRegisterSuccess: () -> Unit, onBa
     var passwordVisible by remember { mutableStateOf(false) }
     var selectedRole by remember { mutableStateOf("client") }
     
+    // Vehicle info for drivers
+    var vehicleType by remember { mutableStateOf("") }
+    var vehicleModel by remember { mutableStateOf("") }
+    var vehiclePlate by remember { mutableStateOf("") }
+    
     val context = LocalContext.current
     val user by viewModel.user.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
@@ -161,6 +166,49 @@ fun RegisterScreen(viewModel: AuthViewModel, onRegisterSuccess: () -> Unit, onBa
                         )
                         Text("Livreur", modifier = Modifier.padding(start = 4.dp))
                     }
+
+                    if (selectedRole == "driver") {
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Text("Informations du véhicule", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Text("Type de véhicule", style = MaterialTheme.typography.labelLarge)
+                        OutlinedTextField(
+                            value = vehicleType,
+                            onValueChange = { vehicleType = it },
+                            placeholder = { Text("Moto, Voiture, Camion...") },
+                            leadingIcon = { Icon(Icons.Default.Category, contentDescription = null) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp),
+                            singleLine = true
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Text("Modèle du véhicule", style = MaterialTheme.typography.labelLarge)
+                        OutlinedTextField(
+                            value = vehicleModel,
+                            onValueChange = { vehicleModel = it },
+                            placeholder = { Text("Peugeot Partner, Honda CB...") },
+                            leadingIcon = { Icon(Icons.Default.LocalShipping, contentDescription = null) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp),
+                            singleLine = true
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Text("Numéro d'immatriculation", style = MaterialTheme.typography.labelLarge)
+                        OutlinedTextField(
+                            value = vehiclePlate,
+                            onValueChange = { vehiclePlate = it },
+                            placeholder = { Text("1234 TAB") },
+                            leadingIcon = { Icon(Icons.Default.Badge, contentDescription = null) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp),
+                            singleLine = true
+                        )
+                    }
                     
                     if (error != null) {
                         Spacer(modifier = Modifier.height(8.dp))
@@ -170,7 +218,15 @@ fun RegisterScreen(viewModel: AuthViewModel, onRegisterSuccess: () -> Unit, onBa
                     Spacer(modifier = Modifier.height(24.dp))
                     
                     Button(
-                        onClick = { viewModel.register(name, email, password, phone, selectedRole, onRegisterSuccess) },
+                        onClick = { 
+                            viewModel.register(
+                                name, email, password, phone, selectedRole,
+                                if (selectedRole == "driver") vehicleType else null,
+                                if (selectedRole == "driver") vehicleModel else null,
+                                if (selectedRole == "driver") vehiclePlate else null,
+                                onSuccess = onRegisterSuccess
+                            ) 
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer),

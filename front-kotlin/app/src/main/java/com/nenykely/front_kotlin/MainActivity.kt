@@ -66,7 +66,7 @@ class MainActivity : ComponentActivity() {
                         if (currentDestination?.route != Screen.Login.route && currentDestination?.route != Screen.Register.route) {
                             Surface(
                                 modifier = Modifier.fillMaxWidth().height(80.dp),
-                                color = Color.White,
+                                color = MaterialTheme.colorScheme.surface,
                                 shadowElevation = 8.dp
                             ) {
                                 Row(
@@ -145,7 +145,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 ) { innerPadding ->
-                    Surface(modifier = Modifier.padding(innerPadding)) {
+                    Surface(modifier = Modifier.padding(innerPadding), color = MaterialTheme.colorScheme.background) {
                         NavGraph(
                             navController = navController,
                             authViewModel = authViewModel,
@@ -166,7 +166,7 @@ fun NavigationItem(
     onClick: () -> Unit
 ) {
     val mintColor = Color(0xFF69F0AE)
-    val contentColor = if (selected) Color(0xFF1A5632) else Color(0xFF757575)
+    val contentColor = if (selected) Color(0xFF1A5632) else MaterialTheme.colorScheme.onSurfaceVariant
 
     Column(
         modifier = Modifier

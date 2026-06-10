@@ -30,8 +30,9 @@ interface ApiService {
         @Body body: Map<String, String?>
     ): Response<User>
 
+    @Headers("Accept: application/json")
     @Multipart
-    @POST("api/auth/profile") // We use POST for multipart in Laravel usually, or PATCH with _method
+    @POST("api/auth/profile")
     suspend fun updateProfileMultipart(
         @Header("Authorization") token: String,
         @Part("name") name: okhttp3.RequestBody?,
@@ -39,8 +40,11 @@ interface ApiService {
         @Part("domicile") domicile: okhttp3.RequestBody?,
         @Part("domicile_lat") domicile_lat: okhttp3.RequestBody?,
         @Part("domicile_lng") domicile_lng: okhttp3.RequestBody?,
+        @Part("vehicle_type") vehicle_type: okhttp3.RequestBody? = null,
+        @Part("vehicle_model") vehicle_model: okhttp3.RequestBody? = null,
+        @Part("vehicle_plate") vehicle_plate: okhttp3.RequestBody? = null,
         @Part avatar: okhttp3.MultipartBody.Part?,
-        @Part("_method") method: okhttp3.RequestBody = "PATCH".toRequestBody("text/plain".toMediaTypeOrNull())
+        @Part("_method") method: okhttp3.RequestBody
     ): Response<User>
 
     @Headers("Accept: application/json")
@@ -81,8 +85,31 @@ interface ApiService {
     suspend fun updateDeliveryStatus(
         @Header("Authorization") token: String,
         @Path("id") id: Int,
-        @Body body: Map<String, String>
+        @Body body: Map<String, String?>
     ): Response<Delivery>
+
+    @Headers("Accept: application/json")
+    @Multipart
+    @POST("api/deliveries/{id}/status")
+    suspend fun updateDeliveryStatusMultipart(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int,
+        @Part("status") status: okhttp3.RequestBody,
+        @Part("signature") signature: okhttp3.RequestBody?,
+        @Part("lat") latitude: okhttp3.RequestBody?,
+        @Part("lng") longitude: okhttp3.RequestBody?,
+        @Part("note") note: okhttp3.RequestBody?,
+        @Part proof_photo: okhttp3.MultipartBody.Part?,
+        @Part("_method") method: okhttp3.RequestBody
+    ): Response<Delivery>
+
+    @Headers("Accept: application/json")
+    @POST("api/deliveries/{id}/rate")
+    suspend fun rateDelivery(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int,
+        @Body body: Map<String, Int>
+    ): Response<Unit>
 
     @Headers("Accept: application/json")
     @GET("api/driver/deliveries")

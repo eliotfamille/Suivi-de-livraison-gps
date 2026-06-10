@@ -43,8 +43,8 @@ fun LoginScreen(
         }
     }
     
-    val primaryBlue = Color(0xFF2563EB)
-    val backgroundGray = Color(0xFFF8FAFC)
+    val primaryBlue = MaterialTheme.colorScheme.primary
+    val backgroundGray = MaterialTheme.colorScheme.background
 
     BoxWithConstraints(
         modifier = Modifier
@@ -71,7 +71,7 @@ fun LoginScreen(
                 Icon(
                     Icons.Default.LocalShipping,
                     contentDescription = null,
-                    tint = Color.White,
+                    tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.padding(16.dp)
                 )
             }
@@ -87,14 +87,14 @@ fun LoginScreen(
             Text(
                 "Efficacité. Rapidité. Précision.",
                 style = MaterialTheme.typography.bodyLarge,
-                color = Color(0xFF64748B)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Spacer(modifier = Modifier.height(32.dp))
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 shape = RoundedCornerShape(24.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
@@ -103,28 +103,28 @@ fun LoginScreen(
                         "Connexion",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF0F172A)
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         "Heureux de vous revoir parmi nous.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF64748B)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    Text("Adresse Email", style = MaterialTheme.typography.labelLarge, color = Color(0xFF0F172A), fontWeight = FontWeight.Bold)
+                    Text("Adresse Email", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = email,
                         onValueChange = { email = it.replace("\n", "").replace("\r", "") },
-                        placeholder = { Text("nom@entreprise.com", color = Color(0xFF94A3B8)) },
-                        leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = Color(0xFF64748B)) },
+                        placeholder = { Text("nom@entreprise.com", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) },
+                        leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = Color(0xFFE2E8F0),
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
                             focusedBorderColor = primaryBlue
                         )
                     )
@@ -132,7 +132,7 @@ fun LoginScreen(
                     Spacer(modifier = Modifier.height(20.dp))
 
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text("Mot de passe", style = MaterialTheme.typography.labelLarge, color = Color(0xFF0F172A), fontWeight = FontWeight.Bold)
+                        Text("Mot de passe", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                         TextButton(onClick = { /* Forgot Password */ }) {
                             Text("Mot de passe oublié ?", color = primaryBlue, fontWeight = FontWeight.SemiBold)
                         }
@@ -140,14 +140,14 @@ fun LoginScreen(
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it.replace("\n", "").replace("\r", "") },
-                        placeholder = { Text("••••••••", color = Color(0xFF94A3B8)) },
-                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFF64748B)) },
+                        placeholder = { Text("••••••••", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) },
+                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                         trailingIcon = {
                             IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                 Icon(
                                     if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                                     contentDescription = null,
-                                    tint = Color(0xFF64748B)
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         },
@@ -156,7 +156,7 @@ fun LoginScreen(
                         shape = RoundedCornerShape(12.dp),
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = Color(0xFFE2E8F0),
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
                             focusedBorderColor = primaryBlue
                         )
                     )
@@ -169,7 +169,7 @@ fun LoginScreen(
                             onCheckedChange = { rememberMe = it },
                             colors = CheckboxDefaults.colors(checkedColor = primaryBlue)
                         )
-                        Text("Se souvenir de moi", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF475569))
+                        Text("Se souvenir de moi", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     if (error != null) {
                         Text(
@@ -195,11 +195,11 @@ fun LoginScreen(
                     }
 
                     Spacer(modifier = Modifier.height(32.dp))
-                    HorizontalDivider(color = Color(0xFFE2E8F0))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     Spacer(modifier = Modifier.height(24.dp))
 
                     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Vous n'avez pas encore de compte ?", color = Color(0xFF64748B))
+                        Text("Vous n'avez pas encore de compte ?", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         TextButton(onClick = onNavigateToRegister) {
                             Text("S'inscrire", color = primaryBlue, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         }
@@ -211,7 +211,7 @@ fun LoginScreen(
             Text(
                 "Système de gestion logistique\nLogistics Pro",
                 style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFF94A3B8),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
         }

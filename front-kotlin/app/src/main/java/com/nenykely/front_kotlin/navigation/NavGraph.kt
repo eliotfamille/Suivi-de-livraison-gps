@@ -20,6 +20,9 @@ sealed class Screen(val route: String) {
     object Tracking : Screen("tracking/{deliveryId}") {
         fun createRoute(deliveryId: Int) = "tracking/$deliveryId"
     }
+    object DeliveryDetails : Screen("delivery_details/{deliveryId}") {
+        fun createRoute(deliveryId: Int) = "delivery_details/$deliveryId"
+    }
     object DriverProfile : Screen("driver_profile/{driverId}") {
         fun createRoute(driverId: Int) = "driver_profile/$driverId"
     }
@@ -95,8 +98,12 @@ fun NavGraph(
                     onNavigateToDeliveries = {
                         navController.navigate(Screen.Deliveries.route)
                     },
-                    onNavigateToTracking = { id ->
-                        navController.navigate(Screen.Tracking.createRoute(id))
+                    onNavigateToDelivery = { id, status ->
+                        if (status == "delivered" || status == "failed") {
+                            navController.navigate(Screen.DeliveryDetails.createRoute(id))
+                        } else {
+                            navController.navigate(Screen.Tracking.createRoute(id))
+                        }
                     }
                 )
             }
@@ -109,8 +116,12 @@ fun NavGraph(
                         navController.navigate(Screen.DriverMission.createRoute(id))
                     })
                 } else {
-                    ClientDeliveriesScreen(t, user, deliveryViewModel, onDeliveryClick = { id ->
-                        navController.navigate(Screen.Tracking.createRoute(id))
+                    ClientDeliveriesScreen(t, user, deliveryViewModel, onDeliveryClick = { delivery ->
+                        if (delivery.status == "delivered" || delivery.status == "failed") {
+                            navController.navigate(Screen.DeliveryDetails.createRoute(delivery.id))
+                        } else {
+                            navController.navigate(Screen.Tracking.createRoute(delivery.id))
+                        }
                     })
                 }
             }
@@ -119,7 +130,19 @@ fun NavGraph(
             val deliveryId = backStackEntry.arguments?.getString("deliveryId")?.toIntOrNull()
             token?.let { t ->
                 deliveryId?.let { id ->
-                    TrackingScreen(t, id, deliveryViewModel, onBack = {
+                    TrackingScreen(t, id, deliveryViewModel, authViewModel, onBack = {
+                        navController.popBackStack()
+                    }, onNavigateToDriver = { driverId ->
+                        navController.navigate(Screen.DriverProfile.createRoute(driverId))
+                    })
+                }
+            }
+        }
+        composable(Screen.DeliveryDetails.route) { backStackEntry ->
+            val deliveryId = backStackEntry.arguments?.getString("deliveryId")?.toIntOrNull()
+            token?.let { t ->
+                deliveryId?.let { id ->
+                    DeliveryDetailsScreen(t, id, deliveryViewModel, onBack = {
                         navController.popBackStack()
                     }, onNavigateToDriver = { driverId ->
                         navController.navigate(Screen.DriverProfile.createRoute(driverId))
@@ -131,7 +154,7 @@ fun NavGraph(
             val deliveryId = backStackEntry.arguments?.getString("deliveryId")?.toIntOrNull()
             token?.let { t ->
                 deliveryId?.let { id ->
-                    DriverMissionScreen(t, id, deliveryViewModel, onBack = {
+                    DriverMissionScreen(t, id, deliveryViewModel, authViewModel, onBack = {
                         navController.popBackStack()
                     }, onSignature = {
                         navController.navigate(Screen.Signature.createRoute(id))
@@ -144,8 +167,11 @@ fun NavGraph(
             token?.let { t ->
                 deliveryId?.let { id ->
                     SignatureScreen(
-                        onSignatureCaptured = { _ ->
-                            deliveryViewModel.updateStatus(t, id, "delivered") {
+                        viewModel = deliveryViewModel,
+                        onSignatureCaptured = { signatureBase64 ->
+                            val photo = deliveryViewModel.proofPhoto.value
+                            deliveryViewModel.updateStatus(t, id, "delivered", signatureBase64 = signatureBase64, photoFile = photo) {
+                                deliveryViewModel.setProofPhoto(null) // Reset after success
                                 navController.navigate(Screen.Deliveries.route) {
                                     popUpTo(Screen.Deliveries.route) { inclusive = true }
                                 }
@@ -160,7 +186,7 @@ fun NavGraph(
             val driverId = backStackEntry.arguments?.getString("driverId")?.toIntOrNull()
             token?.let { t ->
                 driverId?.let { id ->
-                    DriverProfileScreen(id, deliveryViewModel, onBack = {
+                    DriverProfileScreen(t, id, deliveryViewModel, onBack = {
                         navController.popBackStack()
                     })
                 }
@@ -176,7 +202,7 @@ fun NavGraph(
         composable(Screen.Suivi.route) {
             val user by authViewModel.user.collectAsState()
             token?.let {
-                SuiviScreen(it, user, deliveryViewModel)
+                SuiviScreen(it, user, deliveryViewModel, authViewModel)
             }
         }
     }
