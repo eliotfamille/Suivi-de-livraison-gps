@@ -137,18 +137,22 @@ class AuthController extends Controller
         $user->update($data);
 
         // Si l'utilisateur est un livreur, on met aussi à jour son profil Driver
-        if ($user->driver) {
-            $driverData = [];
-            if ($request->has('vehicle_type')) $driverData['vehicle_type'] = $request->vehicle_type;
-            if ($request->has('vehicle_model')) $driverData['vehicle_model'] = $request->vehicle_model;
-            if ($request->has('vehicle_plate')) $driverData['vehicle_plate'] = $request->vehicle_plate;
+        if ($user->hasRole('driver')) {
+            $driverData = array_filter([
+                'vehicle_type'  => $request->vehicle_type,
+                'vehicle_model' => $request->vehicle_model,
+                'vehicle_plate' => $request->vehicle_plate,
+            ]);
 
-            if (!empty($driverData)) {
-                $user->driver->update($driverData);
+            if (!empty($driverData) || !$user->driver) {
+                $user->driver()->updateOrCreate(
+                    ['user_id' => $user->id],
+                    array_merge(['status' => 'available'], $driverData)
+                );
             }
         }
 
-        return response()->json($this->userResource($user));
+        return response()->json($this->userResource($user->load('driver')));
     }
 
     private function userResource(User $user): array
@@ -177,10 +181,12 @@ class AuthController extends Controller
             'bureau_lat'   => $user->bureau_lat,
             'bureau_lng'   => $user->bureau_lng,
             'roles'        => $user->getRoleNames(),
+            'role'         => $user->getRoleNames()->first(),
             'driver'       => $user->driver ? [
                 'id'            => $user->driver->id,
                 'status'        => $user->driver->status,
                 'vehicle_type'  => $user->driver->vehicle_type,
+                'vehicle_model' => $user->driver->vehicle_model,
                 'vehicle_plate' => $user->driver->vehicle_plate,
                 'rating'        => (float) $user->driver->rating,
                 'rating_count'  => $user->driver->rating_count,

@@ -41,6 +41,8 @@ class DriverController extends Controller
             ])
         );
 
+        broadcast(new DriverLocationUpdated($driver, $data['lat'], $data['lng']))->toOthers();
+
         return response()->json([
             'message'  => 'Position mise à jour',
             'location' => [

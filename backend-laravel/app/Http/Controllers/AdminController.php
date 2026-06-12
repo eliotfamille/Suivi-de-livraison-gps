@@ -18,7 +18,7 @@ class AdminController extends Controller
      */
     public function webDashboard(): View
     {
-        // 1. Stats globales adaptées aux clés de dashboard.blade.php
+        // 1. Stats globales
         $stats = [
             'total_deliveries' => Delivery::count(),
             'today_count'      => Delivery::whereDate('created_at', today())->count(),
@@ -27,20 +27,25 @@ class AdminController extends Controller
             'revenue'          => Order::sum('delivery_fee'),
         ];
 
-        // 2. Livraisons récentes (on laisse les objets Eloquent intacts pour le Blade)
-        $recentDeliveries = Delivery::with(['order.client', 'driver.user'])
+        // 2. Toutes les livraisons avec leurs détails (on limite à 50 pour la démo)
+        $allDeliveries = Delivery::with(['order.client', 'driver.user', 'statuses', 'locations'])
             ->latest()
-            ->take(10)
+            ->take(50)
             ->get();
 
-        // 3. Liste complète des livreurs
-        $drivers = Driver::with('user')->get();
-        // 4. LIVREURS ACTIFS (Requis pour la carte interactive du Blade !)
+        // 3. Tous les clients
+        $clients = User::role('client')->withCount('orders')->get();
+
+        // 4. Liste complète des livreurs
+        $drivers = Driver::with(['user', 'deliveries'])->get();
+
+        // 5. LIVREURS POUR LA CARTE (disponibles et en mission)
         $activeDrivers = Driver::with('user')
-            ->where('status', 'busy')
+            ->whereIn('status', ['available', 'busy'])
             ->whereNotNull('current_lat')
             ->get();
-        // 5. Stats spécifiques aux livreurs pour le graphique Donut
+
+        // 6. Stats livreurs
         $driverStats = [
             'total'     => Driver::count(),
             'available' => Driver::where('status', 'available')->count(),
@@ -48,7 +53,7 @@ class AdminController extends Controller
             'offline'   => Driver::where('status', 'offline')->count(),
         ];
 
-        return view('dashboard', compact('stats', 'recentDeliveries', 'drivers', 'activeDrivers', 'driverStats'));
+        return view('dashboard', compact('stats', 'allDeliveries', 'drivers', 'activeDrivers', 'driverStats', 'clients'));
     }
     public function dashboard(Request $request): JsonResponse
     {

@@ -1,5 +1,6 @@
 package com.nenykely.front_kotlin.viewmodel
 
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nenykely.front_kotlin.data.DeliveryRepository
@@ -15,7 +16,9 @@ import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 
-class AuthViewModel(private val repository: DeliveryRepository = DeliveryRepository()) : ViewModel() {
+class AuthViewModel(application: android.app.Application) : AndroidViewModel(application) {
+    private val repository: DeliveryRepository = DeliveryRepository(application)
+
     private val _user = MutableStateFlow<User?>(null)
     val user = _user.asStateFlow()
 

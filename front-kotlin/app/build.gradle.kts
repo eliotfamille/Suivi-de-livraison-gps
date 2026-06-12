@@ -1,15 +1,12 @@
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.androidlegacykapt)
     alias(libs.plugins.kotlin.compose)
 }
 
 android {
     namespace = "com.nenykely.front_kotlin"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.nenykely.front_kotlin"
@@ -38,8 +35,8 @@ android {
         compose = true
     }
     packaging {
-        jniLibs {
-            useLegacyPackaging = true
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
 }
@@ -64,7 +61,7 @@ dependencies {
     // Navigation
     implementation(libs.navigation.compose)
 
-    // Maps
+    // Maps & Location
     implementation(libs.play.services.location)
     implementation(libs.accompanist.permissions)
     implementation(libs.osmdroid.android)
@@ -75,6 +72,16 @@ dependencies {
     implementation(libs.camera.camera2)
     implementation(libs.camera.lifecycle)
     implementation(libs.camera.view)
+
+    // Firebase
+    implementation(platform("com.google.firebase:firebase-bom:33.1.0"))
+    implementation("com.google.firebase:firebase-messaging-ktx")
+
+    // Room
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    kapt(libs.androidx.room.compiler)
+
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

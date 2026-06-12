@@ -347,12 +347,12 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
                     }
                 }
 
-                val roleLabel = when (user?.role) {
-                    "client" -> "Client"
-                    else -> "Livreur"
-                }
+                val isClient = user?.role?.equals("client", ignoreCase = true) == true || 
+                               user?.roles?.any { it.equals("client", ignoreCase = true) } == true
+                val roleLabel = if (user?.isDriver() == true) "Livreur" else if (isClient) "Client" else null
+                
                 Text(
-                    text = if (user?.role != null) roleLabel else "Chargement...",
+                    text = roleLabel ?: "Chargement...",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

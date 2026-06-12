@@ -1,13 +1,17 @@
 package com.nenykely.front_kotlin.data
 
+import android.content.Context
+import com.google.gson.Gson
 import com.nenykely.front_kotlin.data.api.RetrofitClient
 import com.nenykely.front_kotlin.data.models.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.Response
 
-class DeliveryRepository {
+class DeliveryRepository(context: Context? = null) {
     private val api = RetrofitClient.instance
+    private val dao = context?.let { AppDatabase.getDatabase(it).deliveryDao() }
+    private val gson = Gson()
 
     suspend fun register(request: RegisterRequest) = api.register(request)
 
@@ -42,7 +46,31 @@ class DeliveryRepository {
 
     suspend fun tracking(identifier: String) = api.tracking(identifier)
 
-    suspend fun getDeliveries(token: String) = api.getDeliveries("Bearer $token")
+    suspend fun getDeliveries(token: String): Response<List<Delivery>> {
+        return try {
+            val response = api.getDeliveries("Bearer $token")
+            if (response.isSuccessful && response.body() != null) {
+                // Save to local cache
+                dao?.let { d ->
+                    val entities = response.body()!!.map { 
+                        DeliveryEntity(it.id, it.status, gson.toJson(it))
+                    }
+                    d.clearAll()
+                    d.insertDeliveries(entities)
+                }
+            }
+            response
+        } catch (e: Exception) {
+            // Load from cache if network fails
+            val cached = dao?.getAllDeliveries()
+            if (!cached.isNullOrEmpty()) {
+                val deliveries = cached.map { gson.fromJson(it.deliveryJson, Delivery::class.java) }
+                Response.success(deliveries)
+            } else {
+                throw e
+            }
+        }
+    }
 
     suspend fun storeDelivery(token: String, request: StoreDeliveryRequest): Response<DeliveryResponse> =
         api.storeDelivery("Bearer $token", request)
@@ -50,7 +78,18 @@ class DeliveryRepository {
     suspend fun acceptDelivery(token: String, id: Int) = 
         api.acceptDelivery("Bearer $token", id)
 
-    suspend fun getDelivery(token: String, id: Int) = api.getDelivery("Bearer $token", id)
+    suspend fun getDelivery(token: String, id: Int): Response<Delivery> {
+        return try {
+            api.getDelivery("Bearer $token", id)
+        } catch (e: Exception) {
+            val cached = dao?.getAllDeliveries()?.find { it.id == id }
+            if (cached != null) {
+                Response.success(gson.fromJson(cached.deliveryJson, Delivery::class.java))
+            } else {
+                throw e
+            }
+        }
+    }
 
     suspend fun updateDeliveryStatus(token: String, id: Int, body: Map<String, String?>) = 
         api.updateDeliveryStatus("Bearer $token", id, body)
@@ -71,6 +110,9 @@ class DeliveryRepository {
 
     suspend fun rateDelivery(token: String, id: Int, rating: Int) =
         api.rateDelivery("Bearer $token", id, mapOf("rating" to rating))
+
+    suspend fun downloadReceipt(token: String, id: Int) = 
+        api.downloadReceipt("Bearer $token", id)
 
     suspend fun getDriverDeliveries(token: String) = api.getDriverDeliveries("Bearer $token")
 

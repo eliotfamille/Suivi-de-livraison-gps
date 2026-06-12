@@ -96,8 +96,8 @@ interface ApiService {
         @Path("id") id: Int,
         @Part("status") status: okhttp3.RequestBody,
         @Part("signature") signature: okhttp3.RequestBody?,
-        @Part("lat") latitude: okhttp3.RequestBody?,
-        @Part("lng") longitude: okhttp3.RequestBody?,
+        @Part("latitude") latitude: okhttp3.RequestBody?,
+        @Part("longitude") longitude: okhttp3.RequestBody?,
         @Part("note") note: okhttp3.RequestBody?,
         @Part proof_photo: okhttp3.MultipartBody.Part?,
         @Part("_method") method: okhttp3.RequestBody
@@ -110,6 +110,14 @@ interface ApiService {
         @Path("id") id: Int,
         @Body body: Map<String, Int>
     ): Response<Unit>
+
+    @Headers("Accept: application/json")
+    @GET("api/deliveries/{id}/receipt")
+    @Streaming
+    suspend fun downloadReceipt(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int
+    ): Response<okhttp3.ResponseBody>
 
     @Headers("Accept: application/json")
     @GET("api/driver/deliveries")

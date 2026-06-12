@@ -40,6 +40,7 @@ import java.net.URL
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrackingScreen(token: String, deliveryId: Int, viewModel: DeliveryViewModel, authViewModel: AuthViewModel, onBack: () -> Unit, onNavigateToDriver: (Int) -> Unit) {
+    val context = LocalContext.current
     val delivery by viewModel.currentDelivery.collectAsState()
     val isDarkMode by authViewModel.isDarkMode.collectAsState()
     val primaryBlue = MaterialTheme.colorScheme.primary
@@ -77,6 +78,7 @@ fun TrackingScreen(token: String, deliveryId: Int, viewModel: DeliveryViewModel,
                 driverPoint = GeoPoint(currentLat, currentLng)
                 isDataFresh = true
             } else {
+                isDataFresh = false
                 // Si pas de position temps réel, on prend la dernière position connue dans l'historique
                 val lastKnown = del.statuses?.filter { it.lat != null && it.lat != 0.0 }?.maxByOrNull { it.created_at ?: "" }
                 if (lastKnown != null) {
@@ -313,7 +315,19 @@ fun TrackingScreen(token: String, deliveryId: Int, viewModel: DeliveryViewModel,
                                 Text(delivery?.driver?.rating?.toString() ?: "0.0", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                             }
                         }
-                        Surface(modifier = Modifier.size(48.dp), shape = CircleShape, color = primaryBlue, onClick = {}) {
+                        Surface(
+                            modifier = Modifier.size(48.dp),
+                            shape = CircleShape,
+                            color = primaryBlue,
+                            onClick = {
+                                delivery?.driver?.user?.phone?.let { phone ->
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:$phone"))
+                                    context.startActivity(intent)
+                                } ?: run {
+                                    Toast.makeText(context, "Numéro de téléphone indisponible", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        ) {
                             Icon(Icons.Default.Call, null, modifier = Modifier.padding(12.dp), tint = MaterialTheme.colorScheme.onPrimary)
                         }
                     }

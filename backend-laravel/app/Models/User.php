@@ -62,6 +62,11 @@ class User extends Authenticatable
         return $this->hasOne(Driver::class);
     }
 
+    public function orders(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Order::class, 'client_id');
+    }
+
     public function isClient(): bool
     {
         return $this->hasRole('client');

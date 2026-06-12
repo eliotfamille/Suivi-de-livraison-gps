@@ -67,7 +67,7 @@ class Delivery extends Model
             'delivered_at'  => $status === 'delivered' ? now() : $this->delivered_at,
         ]);
 
-        return $this->statuses()->create([
+        $statusRecord = $this->statuses()->create([
             'status'      => $status,
             'label'       => self::STATUS_LABELS[$status] ?? $status,
             'note'        => $note,
@@ -75,6 +75,10 @@ class Delivery extends Model
             'lng'         => $lng,
             'occurred_at' => now(),
         ]);
+
+        broadcast(new \App\Events\DeliveryStatusUpdated($this))->toOthers();
+
+        return $statusRecord;
     }
 
     public function getStatusLabelAttribute(): string

@@ -24,6 +24,9 @@ import androidx.compose.ui.unit.dp
 import com.nenykely.front_kotlin.viewmodel.DeliveryViewModel
 import com.nenykely.front_kotlin.viewmodel.AuthViewModel
 import androidx.compose.ui.viewinterop.AndroidView
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberPermissionState
 import java.io.File
 import java.io.FileOutputStream
 import org.osmdroid.config.Configuration
@@ -39,7 +42,7 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun DriverMissionScreen(token: String, deliveryId: Int, viewModel: DeliveryViewModel, authViewModel: AuthViewModel, onBack: () -> Unit, onSignature: () -> Unit) {
     val context = LocalContext.current
@@ -47,7 +50,9 @@ fun DriverMissionScreen(token: String, deliveryId: Int, viewModel: DeliveryViewM
     val isDarkMode by authViewModel.isDarkMode.collectAsState()
     val error by viewModel.error.collectAsState()
     val primaryBlue = MaterialTheme.colorScheme.primary
-    
+
+    val locationPermissionState = rememberPermissionState(Manifest.permission.ACCESS_FINE_LOCATION)
+
     LaunchedEffect(error) {
         error?.let {
             Toast.makeText(context, it, Toast.LENGTH_LONG).show()
@@ -58,7 +63,7 @@ fun DriverMissionScreen(token: String, deliveryId: Int, viewModel: DeliveryViewM
     var routePoints by remember { mutableStateOf<List<GeoPoint>>(emptyList()) }
     var isFetchingRoute by remember { mutableStateOf(false) }
 
-    // REAL-TIME GPS TRACKING (FREE OPTION)
+    // REAL-TIME GPS TRACKING
     val locationManager = remember { context.getSystemService(Context.LOCATION_SERVICE) as LocationManager }
     val locationListener = remember {
         LocationListener { location ->
@@ -68,16 +73,24 @@ fun DriverMissionScreen(token: String, deliveryId: Int, viewModel: DeliveryViewM
         }
     }
 
-    DisposableEffect(Unit) {
-        try {
-            locationManager.requestLocationUpdates(
-                LocationManager.GPS_PROVIDER,
-                2000L, // 2 seconds
-                1f,    // 1 meter movement
-                locationListener
-            )
-        } catch (e: SecurityException) {
-            Log.e("GPS", "Permission error", e)
+    LaunchedEffect(locationPermissionState.status) {
+        if (!locationPermissionState.status.isGranted) {
+            locationPermissionState.launchPermissionRequest()
+        }
+    }
+
+    DisposableEffect(locationPermissionState.status.isGranted) {
+        if (locationPermissionState.status.isGranted) {
+            try {
+                locationManager.requestLocationUpdates(
+                    LocationManager.GPS_PROVIDER,
+                    5000L, // 5 seconds
+                    2f,    // 2 meters
+                    locationListener
+                )
+            } catch (e: SecurityException) {
+                Log.e("GPS", "Permission error", e)
+            }
         }
         onDispose {
             locationManager.removeUpdates(locationListener)
@@ -282,13 +295,29 @@ fun DriverMissionScreen(token: String, deliveryId: Int, viewModel: DeliveryViewM
                                 }
                             }
                         } else if (status == "delivered") {
-                            Surface(
-                                modifier = Modifier.fillMaxWidth().height(50.dp),
-                                color = Color(0xFFECFDF5),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Text("LIVRÉ", fontWeight = FontWeight.Bold, color = Color(0xFF059669))
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                                    color = Color(0xFFECFDF5),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text("LIVRÉ", fontWeight = FontWeight.Bold, color = Color(0xFF059669))
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    onClick = {
+                                        val fileName = "Bon_Livraison_${delivery?.order?.order_number ?: deliveryId}.pdf"
+                                        viewModel.downloadReceipt(context, token, deliveryId, fileName)
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(Icons.Default.FileDownload, null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Télécharger le PDF")
                                 }
                             }
                         }

@@ -1,5 +1,7 @@
 package com.nenykely.front_kotlin.ui.screens.client
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -30,6 +32,7 @@ import java.time.format.DateTimeFormatter
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DeliveryDetailsScreen(token: String, deliveryId: Int, viewModel: DeliveryViewModel, onBack: () -> Unit, onNavigateToDriver: (Int) -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val delivery by viewModel.currentDelivery.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     
@@ -192,6 +195,22 @@ fun DeliveryDetailsScreen(token: String, deliveryId: Int, viewModel: DeliveryVie
                             }
                             
                             Text("Livré le ${formatFullDate(deliveredAtDate)}", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF059669), fontWeight = FontWeight.Bold)
+
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            Button(
+                            onClick = {
+                                val fileName = "Bon_Livraison_${delivery?.order?.order_number ?: deliveryId}.pdf"
+                                viewModel.downloadReceipt(context, token, deliveryId, fileName)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.FileDownload, null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Télécharger le Bon de Livraison (PDF)")
+                        }
                         }
                     }
                 }

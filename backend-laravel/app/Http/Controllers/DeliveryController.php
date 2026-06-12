@@ -108,6 +108,8 @@ class DeliveryController extends Controller
                 'lng'    => $request->sender_lng,
             ]);
 
+            broadcast(new \App\Events\DeliveryStatusUpdated($delivery))->toOthers();
+
             return $delivery;
         });
 
@@ -155,6 +157,8 @@ class DeliveryController extends Controller
             'note'   => 'La mission a été acceptée par ' . $request->user()->name,
         ]);
 
+        broadcast(new \App\Events\DeliveryStatusUpdated($delivery))->toOthers();
+
         return response()->json($this->deliveryResource($delivery));
     }
 
@@ -195,6 +199,8 @@ class DeliveryController extends Controller
             'lng'    => $request->longitude,
             'note'   => $request->note
         ]);
+
+        broadcast(new \App\Events\DeliveryStatusUpdated($delivery))->toOthers();
 
         // Webhook notification (simulation)
         try {
@@ -258,18 +264,123 @@ class DeliveryController extends Controller
      */
     public function downloadReceipt(Delivery $delivery)
     {
-        // On utilise DomPDF directement sans nouveau fichier vue (on passe du HTML)
-        $html = "<h1>Bon de Livraison #{$delivery->id}</h1>";
-        $html .= "<p>Statut: {$delivery->status}</p>";
-        $html .= "<p>Client: {$delivery->order->recipient_name}</p>";
-        $html .= "<p>Adresse: {$delivery->order->recipient_address}</p>";
-        if ($delivery->signature) {
-            $html .= "<p>Signature: <br/><img src='{$delivery->signature}' width='200'/></p>";
-        }
+        $delivery->load(['order.package', 'driver.user', 'statuses']);
+
+        $data = [
+            'delivery' => $delivery,
+            'qrCode' => "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" . urlencode($delivery->order->order_number)
+        ];
 
         $pdf = \App::make('dompdf.wrapper');
+
+        // CSS inline pour un rendu propre sans fichier externe
+        $html = '
+        <style>
+            body { font-family: sans-serif; color: #333; }
+            .header { text-align: center; border-bottom: 2px solid #00d4ff; padding-bottom: 10px; }
+            .section { margin-top: 20px; }
+            .section-title { font-weight: bold; text-transform: uppercase; color: #64748b; font-size: 12px; margin-bottom: 10px; }
+            .grid { width: 100%; border-collapse: collapse; }
+            .grid td { vertical-align: top; padding: 5px; width: 50%; }
+            .info-box { background: #f8fafc; padding: 10px; border-radius: 5px; }
+            .status { display: inline-block; padding: 5px 10px; background: #00d4ff; color: #000; font-weight: bold; border-radius: 15px; font-size: 10px; }
+            .footer { margin-top: 50px; text-align: center; font-size: 10px; color: #94a3b8; }
+            .signature-img { max-width: 200px; max-height: 100px; border: 1px solid #e2e8f0; }
+            .proof-img { max-width: 300px; border-radius: 10px; }
+        </style>
+        <div class="header">
+            <h1>BON DE LIVRAISON</h1>
+            <p>Commande #' . ($delivery->order->order_number ?? $delivery->id) . '</p>
+        </div>
+
+        <div class="section">
+            <table class="grid">
+                <tr>
+                    <td>
+                        <div class="section-title">Expéditeur</div>
+                        <div class="info-box">
+                            <strong>' . $delivery->order->sender_name . '</strong><br/>
+                            ' . $delivery->order->sender_address . '<br/>
+                            Tél: ' . $delivery->order->sender_phone . '
+                        </div>
+                    </td>
+                    <td>
+                        <div class="section-title">Destinataire</div>
+                        <div class="info-box">
+                            <strong>' . $delivery->order->recipient_name . '</strong><br/>
+                            ' . $delivery->order->recipient_address . '<br/>
+                            Tél: ' . $delivery->order->recipient_phone . '
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Détails du Colis</div>
+            <div class="info-box">
+                Description: ' . ($delivery->order->package->description ?? 'N/A') . '<br/>
+                Poids: ' . ($delivery->order->package->weight_kg ?? '0') . ' kg<br/>
+                Statut Final: <span class="status">' . strtoupper($delivery->status_label) . '</span>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Coordonnées GPS des points</div>
+            <div class="info-box">
+                <table style="width:100%; font-size: 11px;">
+                    <tr>
+                        <td><strong>Départ (Expéditeur) :</strong><br/> Lat: ' . ($delivery->order->sender_lat ?? 'N/A') . ' / Lng: ' . ($delivery->order->sender_lng ?? 'N/A') . '</td>
+                        <td><strong>Arrivée (Destinataire) :</strong><br/> Lat: ' . ($delivery->order->recipient_lat ?? 'N/A') . ' / Lng: ' . ($delivery->order->recipient_lng ?? 'N/A') . '</td>
+                    </tr>
+                </table>
+            </div>
+        </div>';
+
+        if ($delivery->status === 'delivered') {
+            $html .= '
+            <div class="section">
+                <table class="grid">
+                    <tr>
+                        <td>
+                            <div class="section-title">Signature du destinataire</div>';
+            if ($delivery->signature) {
+                $html .= '<img src="' . $delivery->signature . '" class="signature-img">';
+            } else {
+                $html .= '<p>Non signée</p>';
+            }
+
+            if ($delivery->proof_photo) {
+                $photoPath = storage_path('app/public/' . $delivery->proof_photo);
+                if (file_exists($photoPath)) {
+                    $html .= '
+                    <div style="margin-top:20px;">
+                        <div class="section-title">Photo de preuve</div>
+                        <img src="data:image/jpeg;base64,' . base64_encode(file_get_contents($photoPath)) . '" class="proof-img">
+                    </div>';
+                }
+            }
+
+            $html .= '
+                        </td>
+                        <td>
+                            <div class="section-title">Informations de livraison</div>
+                            <p>Livré le: ' . ($delivery->delivered_at ? $delivery->delivered_at->format('d/m/Y H:i') : 'N/A') . '</p>
+                            <p>Livreur: ' . ($delivery->driver?->user?->name ?? 'N/A') . '</p>
+                        </td>
+                    </tr>
+                </table>
+            </div>';
+        }
+
+        $html .= '
+        <div class="footer">
+            Document généré automatiquement par GPS Delivery Tracker - ' . now()->format('d/m/Y H:i') . '<br/>
+            <img src="' . $data['qrCode'] . '" width="80" />
+        </div>';
+
         $pdf->loadHTML($html);
-        return $pdf->download("receipt-{$delivery->id}.pdf");
+        return $pdf->download("Bon_Livraison_{$delivery->order->order_number}.pdf");
     }
 
     private function deliveryResource($delivery): array

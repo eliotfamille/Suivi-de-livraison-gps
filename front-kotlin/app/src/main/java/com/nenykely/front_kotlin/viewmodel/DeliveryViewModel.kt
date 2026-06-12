@@ -1,5 +1,6 @@
 package com.nenykely.front_kotlin.viewmodel
 
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nenykely.front_kotlin.data.DeliveryRepository
@@ -14,8 +15,11 @@ import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.File
+import java.io.FileOutputStream
 
-class DeliveryViewModel(private val repository: DeliveryRepository = DeliveryRepository()) : ViewModel() {
+class DeliveryViewModel(application: android.app.Application) : AndroidViewModel(application) {
+    private val repository: DeliveryRepository = DeliveryRepository(application)
+
     private val _deliveries = MutableStateFlow<List<Delivery>>(emptyList())
     val deliveries = _deliveries.asStateFlow()
 
@@ -179,8 +183,8 @@ class DeliveryViewModel(private val repository: DeliveryRepository = DeliveryRep
                 } else {
                     val body = mutableMapOf<String, String?>(
                         "status" to status,
-                        "lat" to finalLat?.toString(),
-                        "lng" to finalLng?.toString()
+                        "latitude" to finalLat?.toString(),
+                        "longitude" to finalLng?.toString()
                     )
                     repository.updateDeliveryStatus(token, deliveryId, body)
                 }
@@ -224,9 +228,52 @@ class DeliveryViewModel(private val repository: DeliveryRepository = DeliveryRep
         lastLng = lng
         viewModelScope.launch {
             try {
-                repository.updateDriverLocation(token, lat, lng)
+                val response = repository.updateDriverLocation(token, lat, lng)
+                if (!response.isSuccessful) {
+                    android.util.Log.e("DeliveryViewModel", "Location update failed: ${response.code()} ${response.errorBody()?.string()}")
+                } else {
+                    android.util.Log.d("DeliveryViewModel", "Location updated successfully: $lat, $lng")
+                }
             } catch (e: Exception) {
-                android.util.Log.e("DeliveryViewModel", "Location update error")
+                android.util.Log.e("DeliveryViewModel", "Location update error: ${e.message}")
+            }
+        }
+    }
+
+    fun downloadReceipt(context: android.content.Context, token: String, deliveryId: Int, fileName: String) {
+        viewModelScope.launch {
+            try {
+                val response = repository.downloadReceipt(token, deliveryId)
+                if (response.isSuccessful) {
+                    val body = response.body()
+                    if (body != null) {
+                        val file = File(context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS), fileName)
+                        val inputStream = body.byteStream()
+                        val outputStream = FileOutputStream(file)
+                        val buffer = ByteArray(4096)
+                        var read: Int
+                        while (inputStream.read(buffer).also { read = it } != -1) {
+                            outputStream.write(buffer, 0, read)
+                        }
+                        outputStream.flush()
+                        outputStream.close()
+                        inputStream.close()
+                        
+                        // Open the file after download
+                        val uri = androidx.core.content.FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.provider",
+                            file
+                        )
+                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                            setDataAndType(uri, "application/pdf")
+                            flags = android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        context.startActivity(intent)
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("DeliveryViewModel", "Download error: ${e.message}")
             }
         }
     }
