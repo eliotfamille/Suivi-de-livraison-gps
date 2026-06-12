@@ -22,19 +22,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nenykely.front_kotlin.data.models.Delivery
-import com.nenykely.front_kotlin.ui.screens.client.TabButton
+import com.nenykely.front_kotlin.ui.screens.client.BoutonOnglet
 import com.nenykely.front_kotlin.viewmodel.DeliveryViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DriverDeliveriesScreen(token: String, viewModel: DeliveryViewModel, onDeliveryClick: (Int) -> Unit) {
-    val deliveries by viewModel.deliveries.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    val context = LocalContext.current
-    var selectedTab by remember { mutableStateOf(0) }
+fun EcranLivraisonsLivreur(jeton: String, modeleDeVue: DeliveryViewModel, lorsClicLivraison: (Int) -> Unit) {
+    val livraisons by modeleDeVue.livraisons.collectAsState()
+    val estEnChargement by modeleDeVue.estEnChargement.collectAsState()
+    val contexte = LocalContext.current
+    var ongletSelectionne by remember { mutableStateOf(0) }
 
     LaunchedEffect(Unit) {
-        viewModel.fetchDeliveries(token)
+        modeleDeVue.recupererLivraisons(jeton)
     }
 
     Scaffold(
@@ -44,58 +44,58 @@ fun DriverDeliveriesScreen(token: String, viewModel: DeliveryViewModel, onDelive
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         }
-    ) { padding ->
+    ) { espacement ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .padding(espacement)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            // Tabs for Driver
+            // Onglets pour le Livreur
             Surface(
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth().padding(16.dp)
             ) {
                 Row(modifier = Modifier.padding(4.dp)) {
-                    TabButton(
-                        text = "Disponibles", 
-                        isSelected = selectedTab == 0, 
+                    BoutonOnglet(
+                        texte = "Disponibles", 
+                        estSelectionne = ongletSelectionne == 0, 
                         modifier = Modifier.weight(1f),
-                        onClick = { selectedTab = 0 }
+                        lorsClic = { ongletSelectionne = 0 }
                     )
-                    TabButton(
-                        text = "En cours", 
-                        isSelected = selectedTab == 1, 
+                    BoutonOnglet(
+                        texte = "En cours", 
+                        estSelectionne = ongletSelectionne == 1, 
                         modifier = Modifier.weight(1f),
-                        onClick = { selectedTab = 1 }
+                        lorsClic = { ongletSelectionne = 1 }
                     )
                 }
             }
 
-            val filteredDeliveries = if (selectedTab == 0) {
-                deliveries.filter { it.status == "pending" || it.status == "assigned" }
+            val livraisonsFiltrees = if (ongletSelectionne == 0) {
+                livraisons.filter { it.status == "pending" || it.status == "assigned" }
             } else {
-                deliveries.filter { it.status == "picked_up" || it.status == "in_transit" }
+                livraisons.filter { it.status == "picked_up" || it.status == "in_transit" }
             }
 
-            if (isLoading && filteredDeliveries.isEmpty()) {
+            if (estEnChargement && livraisonsFiltrees.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             } else {
                 PullToRefreshBox(
-                    isRefreshing = isLoading,
-                    onRefresh = { viewModel.fetchDeliveries(token) },
+                    isRefreshing = estEnChargement,
+                    onRefresh = { modeleDeVue.recupererLivraisons(jeton) },
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    if (filteredDeliveries.isEmpty()) {
+                    if (livraisonsFiltrees.isEmpty()) {
                         Box(
                             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
                             contentAlignment = Alignment.Center
                         ) {
-                            val emptyMessage = if (selectedTab == 0) "Aucune mission disponible" else "Aucune mission en cours"
-                            Text(emptyMessage, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            val messageVide = if (ongletSelectionne == 0) "Aucune mission disponible" else "Aucune mission en cours"
+                            Text(messageVide, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     } else {
                         LazyColumn(
@@ -103,15 +103,15 @@ fun DriverDeliveriesScreen(token: String, viewModel: DeliveryViewModel, onDelive
                             contentPadding = PaddingValues(16.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            items(filteredDeliveries) { delivery ->
-                                DriverDeliveryCard(
-                                    delivery = delivery,
-                                    onAccept = {
-                                        viewModel.acceptDelivery(token, delivery.id) {
-                                            Toast.makeText(context, "Mission #${delivery.id} acceptée ! Nouveau statut: ASSIGNÉ", Toast.LENGTH_LONG).show()
+                            items(livraisonsFiltrees) { livraison ->
+                                CarteLivraisonLivreur(
+                                    livraison = livraison,
+                                    lorsAcceptation = {
+                                        modeleDeVue.accepterLivraison(jeton, livraison.id) {
+                                            Toast.makeText(contexte, "Mission #${livraison.id} acceptée ! Nouveau statut: ASSIGNÉ", Toast.LENGTH_LONG).show()
                                         }
                                     },
-                                    onClick = { onDeliveryClick(delivery.id) }
+                                    lorsClic = { lorsClicLivraison(livraison.id) }
                                 )
                             }
                         }
@@ -123,26 +123,26 @@ fun DriverDeliveriesScreen(token: String, viewModel: DeliveryViewModel, onDelive
 }
 
 @Composable
-fun DriverDeliveryCard(delivery: Delivery, onAccept: () -> Unit, onClick: () -> Unit) {
+fun CarteLivraisonLivreur(livraison: Delivery, lorsAcceptation: () -> Unit, lorsClic: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        onClick = onClick
+        onClick = lorsClic
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Colis #${delivery.id}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-                val statusInfo = when (delivery.status) {
+                Text("Colis #${livraison.id}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                val infosStatut = when (livraison.status) {
                     "pending" -> Color(0xFFFEF3C7) to "EN ATTENTE"
                     "assigned" -> MaterialTheme.colorScheme.primaryContainer to "ASSIGNÉ"
                     "picked_up" -> Color(0xFFDBEAFE) to "RÉCUPÉRÉ"
                     "in_transit" -> Color(0xFFD1FAE5) to "EN TRANSIT"
-                    else -> MaterialTheme.colorScheme.surfaceVariant to delivery.status.uppercase()
+                    else -> MaterialTheme.colorScheme.surfaceVariant to livraison.status.uppercase()
                 }
                 
-                val textColor = when (delivery.status) {
+                val couleurTexte = when (livraison.status) {
                     "pending" -> Color(0xFF92400E)
                     "assigned" -> MaterialTheme.colorScheme.onPrimaryContainer
                     "picked_up" -> Color(0xFF1E40AF)
@@ -151,14 +151,14 @@ fun DriverDeliveryCard(delivery: Delivery, onAccept: () -> Unit, onClick: () -> 
                 }
 
                 Surface(
-                    color = statusInfo.first,
+                    color = infosStatut.first,
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        text = statusInfo.second,
+                        text = infosStatut.second,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.labelSmall,
-                        color = textColor
+                        color = couleurTexte
                     )
                 }
             }
@@ -168,14 +168,14 @@ fun DriverDeliveryCard(delivery: Delivery, onAccept: () -> Unit, onClick: () -> 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.LocationOn, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text(delivery.order?.recipient_address ?: "Adresse inconnue", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(livraison.order?.recipient_address ?: "Adresse inconnue", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (delivery.status == "pending") {
+            if (livraison.status == "pending") {
                 Button(
-                    onClick = onAccept,
+                    onClick = lorsAcceptation,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
@@ -183,19 +183,19 @@ fun DriverDeliveryCard(delivery: Delivery, onAccept: () -> Unit, onClick: () -> 
                     Text("Accepter la mission", color = MaterialTheme.colorScheme.onPrimary)
                 }
             } else {
-                val buttonText = when(delivery.status) {
+                val texteBouton = when(livraison.status) {
                     "assigned" -> "Démarrer la mission"
                     "picked_up", "in_transit" -> "Continuer la mission"
                     else -> "Voir les détails"
                 }
                 OutlinedButton(
-                    onClick = onClick,
+                    onClick = lorsClic,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
                 ) {
-                    Text(buttonText)
+                    Text(texteBouton)
                 }
             }
         }

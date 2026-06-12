@@ -14,6 +14,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,44 +32,44 @@ import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DeliveryDetailsScreen(token: String, deliveryId: Int, viewModel: DeliveryViewModel, onBack: () -> Unit, onNavigateToDriver: (Int) -> Unit) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val delivery by viewModel.currentDelivery.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
+fun EcranDetailsLivraison(jeton: String, livraisonId: Int, modeleDeVue: DeliveryViewModel, lorsRetour: () -> Unit, lorsNavigationVersLivreur: (Int) -> Unit) {
+    val contexte = androidx.compose.ui.platform.LocalContext.current
+    val livraison by modeleDeVue.livraisonActuelle.collectAsState()
+    val estEnChargement by modeleDeVue.estEnChargement.collectAsState()
     
-    val timeFormatter = remember { DateTimeFormatter.ofPattern("dd MMM yyyy à HH:mm") }
-    val formatFullDate: (String?) -> String = { isoString ->
+    val formateurDate = remember { DateTimeFormatter.ofPattern("dd MMM yyyy à HH:mm") }
+    val formaterDateComplete: (String?) -> String = { chaineIso ->
         try {
-            if (isoString.isNullOrBlank()) "N/A"
-            else ZonedDateTime.parse(isoString).format(timeFormatter)
+            if (chaineIso.isNullOrBlank()) "N/A"
+            else ZonedDateTime.parse(chaineIso).format(formateurDate)
         } catch (e: Exception) {
-            isoString?.take(16)?.replace("T", " ") ?: "N/A"
+            chaineIso?.take(16)?.replace("T", " ") ?: "N/A"
         }
     }
 
-    val getImageUrl: (String?) -> Any? = { path ->
-        if (path.isNullOrBlank()) null
+    val obtenirUrlImage: (String?) -> Any? = { chemin ->
+        if (chemin.isNullOrBlank()) null
         else {
-            val normalizedPath = path.replace("\\/", "/")
-            if (normalizedPath.startsWith("http")) normalizedPath
-            else if (normalizedPath.startsWith("data:image")) {
+            val cheminNormalise = chemin.replace("\\/", "/")
+            if (cheminNormalise.startsWith("http")) cheminNormalise
+            else if (cheminNormalise.startsWith("data:image")) {
                 try {
-                    val base64Data = normalizedPath.substringAfter("base64,")
-                    val imageBytes = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
-                    android.graphics.BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                    val donneesBase64 = cheminNormalise.substringAfter("base64,")
+                    val octetsImage = android.util.Base64.decode(donneesBase64, android.util.Base64.DEFAULT)
+                    android.graphics.BitmapFactory.decodeByteArray(octetsImage, 0, octetsImage.size)
                 } catch (e: Exception) {
-                    normalizedPath
+                    cheminNormalise
                 }
             } else {
-                val cleanPath = normalizedPath.removePrefix("/")
-                val finalPath = if (cleanPath.startsWith("storage/")) cleanPath else "storage/$cleanPath"
-                "${RetrofitClient.BASE_URL.removeSuffix("/")}/$finalPath"
+                val cheminPropre = cheminNormalise.removePrefix("/")
+                val cheminFinal = if (cheminPropre.startsWith("storage/")) cheminPropre else "storage/$cheminPropre"
+                "${RetrofitClient.BASE_URL.removeSuffix("/")}/$cheminFinal"
             }
         }
     }
 
-    LaunchedEffect(deliveryId) {
-        viewModel.fetchTracking(token, deliveryId)
+    LaunchedEffect(livraisonId) {
+        modeleDeVue.recupererSuivi(jeton, livraisonId)
     }
 
     Scaffold(
@@ -76,15 +77,15 @@ fun DeliveryDetailsScreen(token: String, deliveryId: Int, viewModel: DeliveryVie
             TopAppBar(
                 title = { Text("Détails de la livraison", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = lorsRetour) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour", tint = MaterialTheme.colorScheme.onSurface)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         }
-    ) { padding ->
-        if (isLoading && delivery == null) {
+    ) { espacement ->
+        if (estEnChargement && livraison == null) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
@@ -92,13 +93,13 @@ fun DeliveryDetailsScreen(token: String, deliveryId: Int, viewModel: DeliveryVie
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding)
+                    .padding(espacement)
                     .background(MaterialTheme.colorScheme.background)
                     .verticalScroll(rememberScrollState())
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Status Header
+                // En-tête du statut
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -106,29 +107,33 @@ fun DeliveryDetailsScreen(token: String, deliveryId: Int, viewModel: DeliveryVie
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            val (color, label) = when(delivery?.status) {
+                            val (couleur, libelle) = when(livraison?.status) {
                                 "delivered" -> Color(0xFF059669) to "LIVRÉ"
                                 "failed" -> MaterialTheme.colorScheme.error to "ÉCHEC"
-                                else -> MaterialTheme.colorScheme.primary to (delivery?.status?.uppercase() ?: "CHARGEMENT")
+                                "pending" -> Color(0xFFD97706) to "EN ATTENTE"
+                                "assigned" -> MaterialTheme.colorScheme.primary to "ASSIGNÉ"
+                                "picked_up" -> MaterialTheme.colorScheme.primary to "RÉCUPÉRÉ"
+                                "in_transit" -> MaterialTheme.colorScheme.primary to "EN COURS"
+                                else -> MaterialTheme.colorScheme.primary to (livraison?.status?.uppercase() ?: "CHARGEMENT")
                             }
-                            Box(modifier = Modifier.size(12.dp).background(color, CircleShape))
+                            Box(modifier = Modifier.size(12.dp).background(couleur, CircleShape))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(label, fontWeight = FontWeight.Black, color = color, style = MaterialTheme.typography.labelLarge)
+                            Text(libelle, fontWeight = FontWeight.Black, color = couleur, style = MaterialTheme.typography.labelLarge)
                         }
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("Commande #${delivery?.id}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                        Text("Créée le ${formatFullDate(delivery?.created_at)}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                        Text("Commande #${livraison?.id}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        Text("Créée le ${formaterDateComplete(livraison?.created_at)}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
 
-                // Driver Info Card
-                if (delivery?.driver != null) {
+                // Carte des informations du livreur
+                if (livraison?.driver != null) {
                     Text("LIVREUR ASSIGNÉ", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         shape = RoundedCornerShape(16.dp),
-                        onClick = { delivery?.driver?.id?.let { onNavigateToDriver(it) } }
+                        onClick = { livraison?.driver?.id?.let { lorsNavigationVersLivreur(it) } }
                     ) {
                         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                             Surface(modifier = Modifier.size(48.dp), shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant) {
@@ -136,7 +141,7 @@ fun DeliveryDetailsScreen(token: String, deliveryId: Int, viewModel: DeliveryVie
                             }
                             Spacer(modifier = Modifier.width(16.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(delivery?.driver?.user?.name ?: "Livreur", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                Text(livraison?.driver?.user?.name ?: "Livreur", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                 Text("Voir le profil", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                             }
                             Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.outlineVariant)
@@ -144,9 +149,9 @@ fun DeliveryDetailsScreen(token: String, deliveryId: Int, viewModel: DeliveryVie
                     }
                 }
 
-                // Proof of Delivery (Photo & Signature)
-                if (delivery?.status == "delivered") {
-                    val deliveredAtDate = delivery?.delivered_at ?: delivery?.statuses?.find { it.status == "delivered" }?.created_at
+                // Preuves de livraison (Photo & Signature)
+                if (livraison?.status == "delivered") {
+                    val dateLivraison = livraison?.delivered_at ?: livraison?.statuses?.find { it.status == "delivered" }?.created_at
                     
                     Text("PREUVES DE LIVRAISON", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Card(
@@ -155,10 +160,10 @@ fun DeliveryDetailsScreen(token: String, deliveryId: Int, viewModel: DeliveryVie
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            if (delivery?.proof_photo != null) {
+                            if (livraison?.proof_photo != null) {
                                 Text("Photo de preuve", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                 AsyncImage(
-                                    model = getImageUrl(delivery?.proof_photo),
+                                    model = obtenirUrlImage(livraison?.proof_photo),
                                     contentDescription = "Photo de preuve",
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -169,7 +174,7 @@ fun DeliveryDetailsScreen(token: String, deliveryId: Int, viewModel: DeliveryVie
                                 )
                             }
                             
-                            if (delivery?.signature != null) {
+                            if (livraison?.signature != null) {
                                 Text("Signature du destinataire", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                 Box(
                                     modifier = Modifier
@@ -180,42 +185,42 @@ fun DeliveryDetailsScreen(token: String, deliveryId: Int, viewModel: DeliveryVie
                                         .padding(8.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    val signatureModel = getImageUrl(delivery?.signature)
+                                    val modeleSignature = obtenirUrlImage(livraison?.signature)
                                     
                                     AsyncImage(
-                                        model = signatureModel,
+                                        model = modeleSignature,
                                         contentDescription = "Signature",
                                         modifier = Modifier.fillMaxSize(),
                                         contentScale = ContentScale.Fit,
-                                        onError = { error -> 
-                                            android.util.Log.e("SignatureLoad", "Error loading signature: ${error.result.throwable.message}")
+                                        onError = { erreur -> 
+                                            android.util.Log.e("SignatureLoad", "Erreur lors du chargement de la signature : ${erreur.result.throwable.message}")
                                         }
                                     )
                                 }
                             }
                             
-                            Text("Livré le ${formatFullDate(deliveredAtDate)}", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF059669), fontWeight = FontWeight.Bold)
+                            Text("Livré le ${formaterDateComplete(dateLivraison)}", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF059669), fontWeight = FontWeight.Bold)
 
                             Spacer(modifier = Modifier.height(8.dp))
                             
                             Button(
-                            onClick = {
-                                val fileName = "Bon_Livraison_${delivery?.order?.order_number ?: deliveryId}.pdf"
-                                viewModel.downloadReceipt(context, token, deliveryId, fileName)
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(Icons.Default.FileDownload, null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Télécharger le Bon de Livraison (PDF)")
-                        }
+                                onClick = {
+                                    val nomFichier = "Bon_Livraison_${livraison?.order?.order_number ?: livraisonId}.pdf"
+                                    modeleDeVue.telechargerRecu(contexte, jeton, livraisonId, nomFichier)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(Icons.Default.FileDownload, null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Télécharger le Bon de Livraison (PDF)")
+                            }
                         }
                     }
                 }
 
-                // Journey Details
+                // Détails du trajet
                 Text("DÉTAILS DU PARCOURS", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -223,13 +228,13 @@ fun DeliveryDetailsScreen(token: String, deliveryId: Int, viewModel: DeliveryVie
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        JourneyRow(Icons.Default.Outbound, "Expéditeur", delivery?.order?.sender_name ?: "N/A", delivery?.order?.sender_address ?: "")
+                        LigneTrajet(Icons.Default.Outbound, "Expéditeur", livraison?.order?.sender_name ?: "N/A", livraison?.order?.sender_address ?: "")
                         Spacer(modifier = Modifier.height(16.dp))
-                        JourneyRow(Icons.Default.LocationOn, "Destinataire", delivery?.order?.recipient_name ?: "N/A", delivery?.order?.recipient_address ?: "")
+                        LigneTrajet(Icons.Default.LocationOn, "Destinataire", livraison?.order?.recipient_name ?: "N/A", livraison?.order?.recipient_address ?: "")
                     }
                 }
 
-                // Timeline
+                // Historique des étapes
                 Text("HISTORIQUE DES ÉTAPES", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -237,7 +242,7 @@ fun DeliveryDetailsScreen(token: String, deliveryId: Int, viewModel: DeliveryVie
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        delivery?.statuses?.sortedByDescending { it.created_at }?.forEach { status ->
+                        livraison?.statuses?.sortedByDescending { it.created_at }?.forEach { statut ->
                             Row(modifier = Modifier.padding(vertical = 8.dp)) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(24.dp)) {
                                     Box(modifier = Modifier.size(10.dp).background(MaterialTheme.colorScheme.primary, CircleShape))
@@ -245,10 +250,10 @@ fun DeliveryDetailsScreen(token: String, deliveryId: Int, viewModel: DeliveryVie
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
-                                    Text(status.label, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                                    Text(formatFullDate(status.created_at), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    if (!status.note.isNullOrBlank()) {
-                                        Text(status.note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(statut.label, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                    Text(formaterDateComplete(statut.created_at), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    if (!statut.note.isNullOrBlank()) {
+                                        Text(statut.note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                 }
                             }
@@ -261,16 +266,16 @@ fun DeliveryDetailsScreen(token: String, deliveryId: Int, viewModel: DeliveryVie
 }
 
 @Composable
-fun JourneyRow(icon: androidx.compose.ui.graphics.vector.ImageVector, type: String, name: String, address: String) {
+fun LigneTrajet(icone: androidx.compose.ui.graphics.vector.ImageVector, type: String, nom: String, adresse: String) {
     Row(verticalAlignment = Alignment.Top) {
         Surface(modifier = Modifier.size(36.dp), shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant) {
-            Icon(icon, null, modifier = Modifier.padding(8.dp), tint = MaterialTheme.colorScheme.primary)
+            Icon(icone, null, modifier = Modifier.padding(8.dp), tint = MaterialTheme.colorScheme.primary)
         }
         Spacer(modifier = Modifier.width(12.dp))
         Column {
             Text(type, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(name, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-            Text(address, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(nom, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            Text(adresse, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

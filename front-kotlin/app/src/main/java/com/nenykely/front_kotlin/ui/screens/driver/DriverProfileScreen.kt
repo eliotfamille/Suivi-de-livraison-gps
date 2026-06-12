@@ -27,17 +27,17 @@ import com.nenykely.front_kotlin.viewmodel.DeliveryViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DriverProfileScreen(token: String, driverId: Int, viewModel: DeliveryViewModel, onBack: () -> Unit) {
-    val delivery by viewModel.currentDelivery.collectAsState()
-    val driver = delivery?.driver
-    val isLoading by viewModel.isLoading.collectAsState()
-    val context = LocalContext.current
+fun EcranProfilLivreur(jeton: String, livreurId: Int, modeleDeVue: DeliveryViewModel, lorsRetour: () -> Unit) {
+    val livraison by modeleDeVue.livraisonActuelle.collectAsState()
+    val livreur = livraison?.driver
+    val estEnChargement by modeleDeVue.estEnChargement.collectAsState()
+    val contexte = LocalContext.current
     
-    var userRating by remember { mutableStateOf(delivery?.rating ?: 0) }
-    val primaryBlue = MaterialTheme.colorScheme.primary
+    var noteUtilisateur by remember { mutableStateOf(livraison?.rating ?: 0) }
+    val bleuPrimaire = MaterialTheme.colorScheme.primary
 
-    LaunchedEffect(delivery?.rating) {
-        delivery?.rating?.let { userRating = it }
+    LaunchedEffect(livraison?.rating) {
+        livraison?.rating?.let { noteUtilisateur = it }
     }
 
     Scaffold(
@@ -45,24 +45,24 @@ fun DriverProfileScreen(token: String, driverId: Int, viewModel: DeliveryViewMod
             TopAppBar(
                 title = { Text("Profil Livreur", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = lorsRetour) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour", tint = MaterialTheme.colorScheme.onSurface)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         }
-    ) { padding ->
+    ) { espacement ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .padding(espacement)
                 .background(MaterialTheme.colorScheme.background)
                 .verticalScroll(rememberScrollState())
                 .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Driver Header Card
+            // En-tête du profil livreur
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -75,9 +75,9 @@ fun DriverProfileScreen(token: String, driverId: Int, viewModel: DeliveryViewMod
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.surfaceVariant
                     ) {
-                        if (driver?.user?.avatar != null) {
+                        if (livreur?.user?.avatar != null) {
                             AsyncImage(
-                                model = driver.user.avatar,
+                                model = livreur.user.avatar,
                                 contentDescription = null,
                                 modifier = Modifier.fillMaxSize().clip(CircleShape)
                             )
@@ -87,32 +87,32 @@ fun DriverProfileScreen(token: String, driverId: Int, viewModel: DeliveryViewMod
                     }
                     Spacer(modifier = Modifier.width(20.dp))
                     Column {
-                        Text(driver?.user?.name ?: "Chargement...", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSurface)
+                        Text(livreur?.user?.name ?: "Chargement...", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSurface)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Verified, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text(if (driver?.rating != null && driver.rating >= 4.5) "Livreur Senior" else "Livreur", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(if (livreur?.rating != null && livreur.rating >= 4.5) "Livreur Senior" else "Livreur", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Spacer(modifier = Modifier.height(10.dp))
-                        val statusLabel = when(driver?.status) {
+                        val libelleStatut = when(livreur?.status) {
                             "available" -> "Disponible"
                             "busy" -> "En mission"
                             "offline" -> "Hors ligne"
                             else -> "Inconnu"
                         }
-                        val statusColor = when(driver?.status) {
+                        val couleurStatut = when(livreur?.status) {
                             "available" -> Color(0xFF10B981)
                             "busy" -> Color(0xFFF59E0B)
                             else -> Color(0xFF64748B)
                         }
                         Surface(
-                            color = statusColor.copy(alpha = 0.1f),
+                            color = couleurStatut.copy(alpha = 0.1f),
                             shape = RoundedCornerShape(20.dp)
                         ) {
                             Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Box(modifier = Modifier.size(8.dp).background(statusColor, CircleShape))
+                                Box(modifier = Modifier.size(8.dp).background(couleurStatut, CircleShape))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(statusLabel, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = statusColor)
+                                Text(libelleStatut, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = couleurStatut)
                             }
                         }
                     }
@@ -121,28 +121,28 @@ fun DriverProfileScreen(token: String, driverId: Int, viewModel: DeliveryViewMod
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Stats Row
+            // Ligne des statistiques
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatCard(
+                CarteStatistique(
                     modifier = Modifier.weight(1f), 
-                    icon = Icons.Default.Inventory2, 
-                    iconColor = Color(0xFF2563EB), 
-                    value = (driver?.total_deliveries ?: 0).toString(), 
-                    label = "Livraisons"
+                    icone = Icons.Default.Inventory2, 
+                    couleurIcone = Color(0xFF2563EB), 
+                    valeur = (livreur?.total_deliveries ?: 0).toString(), 
+                    libelle = "Livraisons"
                 )
-                StatCard(
+                CarteStatistique(
                     modifier = Modifier.weight(1f), 
-                    icon = Icons.Default.Star, 
-                    iconColor = Color(0xFFF59E0B), 
-                    value = String.format(java.util.Locale.US, "%.1f", driver?.rating ?: 0.0), 
-                    label = "Note moyenne"
+                    icone = Icons.Default.Star, 
+                    couleurIcone = Color(0xFFF59E0B), 
+                    valeur = String.format(java.util.Locale.US, "%.1f", livreur?.rating ?: 0.0), 
+                    libelle = "Note moyenne"
                 )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Rating Section (Visible for clients after delivery)
-            if (delivery?.status == "delivered") {
+            // Section de notation (Visible pour les clients après la livraison)
+            if (livraison?.status == "delivered") {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)),
@@ -151,7 +151,7 @@ fun DriverProfileScreen(token: String, driverId: Int, viewModel: DeliveryViewMod
                 ) {
                     Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            if (delivery?.rating == null) "Noter ce livreur" else "Modifier votre note", 
+                            if (livraison?.rating == null) "Noter ce livreur" else "Modifier votre note", 
                             style = MaterialTheme.typography.titleMedium, 
                             fontWeight = FontWeight.Bold, 
                             color = MaterialTheme.colorScheme.onSecondaryContainer
@@ -162,11 +162,11 @@ fun DriverProfileScreen(token: String, driverId: Int, viewModel: DeliveryViewMod
                         
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             (1..5).forEach { index ->
-                                IconButton(onClick = { userRating = index }) {
+                                IconButton(onClick = { noteUtilisateur = index }) {
                                     Icon(
-                                        imageVector = if (index <= userRating) Icons.Default.Star else Icons.Default.StarBorder,
+                                        imageVector = if (index <= noteUtilisateur) Icons.Default.Star else Icons.Default.StarBorder,
                                         contentDescription = null,
-                                        tint = if (index <= userRating) Color(0xFFF59E0B) else Color(0xFFD1D5DB),
+                                        tint = if (index <= noteUtilisateur) Color(0xFFF59E0B) else Color(0xFFD1D5DB),
                                         modifier = Modifier.size(32.dp)
                                     )
                                 }
@@ -177,23 +177,23 @@ fun DriverProfileScreen(token: String, driverId: Int, viewModel: DeliveryViewMod
                         
                         Button(
                             onClick = { 
-                                viewModel.rateDelivery(token, delivery!!.id, userRating) {
-                                    Toast.makeText(context, "Note mise à jour !", Toast.LENGTH_SHORT).show()
+                                modeleDeVue.noterLivraison(jeton, livraison!!.id, noteUtilisateur) {
+                                    Toast.makeText(contexte, "Note mise à jour !", Toast.LENGTH_SHORT).show()
                                 }
                             },
-                            enabled = userRating > 0 && !isLoading && userRating != delivery?.rating,
+                            enabled = noteUtilisateur > 0 && !estEnChargement && noteUtilisateur != livraison?.rating,
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B)),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            if (isLoading) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
-                            else Text(if (delivery?.rating == null) "Envoyer la note" else "Mettre à jour", fontWeight = FontWeight.Bold)
+                            if (estEnChargement) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                            else Text(if (livraison?.rating == null) "Envoyer la note" else "Mettre à jour", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
                 Spacer(modifier = Modifier.height(24.dp))
             }
 
-            // Vehicle Details
+            // Détails du véhicule
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -203,29 +203,29 @@ fun DriverProfileScreen(token: String, driverId: Int, viewModel: DeliveryViewMod
                 Column(modifier = Modifier.padding(20.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(modifier = Modifier.size(40.dp), shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)) {
-                            Icon(Icons.Default.LocalShipping, contentDescription = null, modifier = Modifier.padding(8.dp), tint = primaryBlue)
+                            Icon(Icons.Default.LocalShipping, contentDescription = null, modifier = Modifier.padding(8.dp), tint = bleuPrimaire)
                         }
                         Spacer(modifier = Modifier.width(16.dp))
                         Text("Détails du véhicule", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                     }
                     Spacer(modifier = Modifier.height(24.dp))
                     
-                    VehicleDetailRow("Modèle", driver?.vehicle_model ?: "Non renseigné")
+                    LigneDetailVehicule("Modèle", livreur?.vehicle_model ?: "Non renseigné")
                     HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                    VehicleDetailRow("Type", driver?.vehicle_type ?: "Non renseigné")
+                    LigneDetailVehicule("Type", livreur?.vehicle_type ?: "Non renseigné")
                     HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Text("Immatriculation", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Surface(
-                            color = primaryBlue.copy(alpha = 0.1f),
+                            color = bleuPrimaire.copy(alpha = 0.1f),
                             shape = RoundedCornerShape(6.dp)
                         ) {
                             Text(
-                                driver?.vehicle_plate ?: "N/A",
+                                livreur?.vehicle_plate ?: "N/A",
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold,
-                                color = primaryBlue,
+                                color = bleuPrimaire,
                                 letterSpacing = 1.sp
                             )
                         }
@@ -237,7 +237,7 @@ fun DriverProfileScreen(token: String, driverId: Int, viewModel: DeliveryViewMod
 }
 
 @Composable
-fun StatCard(modifier: Modifier = Modifier, icon: ImageVector, iconColor: Color, value: String, label: String) {
+fun CarteStatistique(modifier: Modifier = Modifier, icone: ImageVector, couleurIcone: Color, valeur: String, libelle: String) {
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -245,20 +245,20 @@ fun StatCard(modifier: Modifier = Modifier, icon: ImageVector, iconColor: Color,
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Surface(modifier = Modifier.size(40.dp), shape = CircleShape, color = iconColor.copy(alpha = 0.1f)) {
-                Icon(icon, contentDescription = null, modifier = Modifier.padding(10.dp), tint = iconColor)
+            Surface(modifier = Modifier.size(40.dp), shape = CircleShape, color = couleurIcone.copy(alpha = 0.1f)) {
+                Icon(icone, contentDescription = null, modifier = Modifier.padding(10.dp), tint = couleurIcone)
             }
             Spacer(modifier = Modifier.height(12.dp))
-            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSurface)
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(valeur, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSurface)
+            Text(libelle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
 @Composable
-fun VehicleDetailRow(label: String, value: String) {
+fun LigneDetailVehicule(libelle: String, valeur: String) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+        Text(libelle, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(valeur, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
     }
 }

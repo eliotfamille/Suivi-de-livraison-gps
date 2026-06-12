@@ -2,13 +2,27 @@ package com.nenykely.front_kotlin.ui.screens.common
 
 import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,39 +35,38 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nenykely.front_kotlin.viewmodel.AuthViewModel
+import com.nenykely.front_kotlin.data.models.User
 
 @Composable
-fun LoginScreen(
-    viewModel: AuthViewModel,
-    onLoginSuccess: () -> Unit,
-    onNavigateToRegister: () -> Unit
+fun EcranConnexion(
+    modeleDeVue: AuthViewModel,
+    lorsSuccesConnexion: () -> Unit,
+    lorsNavigationVersInscription: () -> Unit,
+    lorsMotDePasseOublie: () -> Unit
 ) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
-    var rememberMe by remember { mutableStateOf(false) }
+    var courriel by remember { mutableStateOf("") }
+    var motDePasse by remember { mutableStateOf("") }
+    var motDePasseVisible by remember { mutableStateOf(false) }
+    var seSouvenirDeMoi by remember { mutableStateOf(false) }
 
-    val error by viewModel.error.collectAsState()
-    val context = LocalContext.current
-    val user by viewModel.user.collectAsState()
+    val erreur by modeleDeVue.erreur.collectAsState()
+    val contexte = LocalContext.current
+    val utilisateur: User? by modeleDeVue.utilisateur.collectAsState()
     
-    LaunchedEffect(user) {
-        user?.let {
-            Toast.makeText(context, "Bienvenue ${it.name} (${it.role ?: it.roles?.firstOrNull() ?: "Utilisateur"})", Toast.LENGTH_LONG).show()
+    LaunchedEffect(utilisateur) {
+        utilisateur?.let {
+            Toast.makeText(contexte, "Bienvenue ${it.name} (${it.role ?: it.roles?.firstOrNull() ?: "Utilisateur"})", Toast.LENGTH_LONG).show()
         }
     }
     
-    val primaryBlue = MaterialTheme.colorScheme.primary
-    val backgroundGray = MaterialTheme.colorScheme.background
+    val bleuPrimaire = MaterialTheme.colorScheme.primary
+    val grisFond = MaterialTheme.colorScheme.background
 
-    BoxWithConstraints(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(backgroundGray)
+            .background(grisFond)
     ) {
-        val screenHeight = maxHeight
-        val screenWidth = maxWidth
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -65,15 +78,17 @@ fun LoginScreen(
             // Logo
             Surface(
                 modifier = Modifier.size(80.dp),
-                color = primaryBlue,
+                color = bleuPrimaire,
                 shape = RoundedCornerShape(20.dp)
             ) {
-                Icon(
-                    Icons.Default.LocalShipping,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.padding(16.dp)
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Default.LocalShipping,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -82,7 +97,7 @@ fun LoginScreen(
                 "Logistics Pro",
                 style = MaterialTheme.typography.displaySmall,
                 fontWeight = FontWeight.Black,
-                color = primaryBlue
+                color = bleuPrimaire
             )
             Text(
                 "Efficacité. Rapidité. Précision.",
@@ -116,8 +131,8 @@ fun LoginScreen(
                     Text("Adresse Email", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
-                        value = email,
-                        onValueChange = { email = it.replace("\n", "").replace("\r", "") },
+                        value = courriel,
+                        onValueChange = { courriel = it.replace("\n", "").replace("\r", "") },
                         placeholder = { Text("nom@entreprise.com", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) },
                         leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                         modifier = Modifier.fillMaxWidth(),
@@ -125,7 +140,7 @@ fun LoginScreen(
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                            focusedBorderColor = primaryBlue
+                            focusedBorderColor = bleuPrimaire
                         )
                     )
 
@@ -133,19 +148,19 @@ fun LoginScreen(
 
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Text("Mot de passe", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
-                        TextButton(onClick = { /* Forgot Password */ }) {
-                            Text("Mot de passe oublié ?", color = primaryBlue, fontWeight = FontWeight.SemiBold)
+                        TextButton(onClick = lorsMotDePasseOublie) {
+                            Text("Mot de passe oublié ?", color = bleuPrimaire, fontWeight = FontWeight.SemiBold)
                         }
                     }
                     OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it.replace("\n", "").replace("\r", "") },
+                        value = motDePasse,
+                        onValueChange = { motDePasse = it.replace("\n", "").replace("\r", "") },
                         placeholder = { Text("••••••••", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) },
                         leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                         trailingIcon = {
-                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            IconButton(onClick = { motDePasseVisible = !motDePasseVisible }) {
                                 Icon(
-                                    if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    if (motDePasseVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -154,10 +169,10 @@ fun LoginScreen(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        visualTransformation = if (motDePasseVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         colors = OutlinedTextFieldDefaults.colors(
                             unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                            focusedBorderColor = primaryBlue
+                            focusedBorderColor = bleuPrimaire
                         )
                     )
 
@@ -165,15 +180,15 @@ fun LoginScreen(
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(
-                            checked = rememberMe,
-                            onCheckedChange = { rememberMe = it },
-                            colors = CheckboxDefaults.colors(checkedColor = primaryBlue)
+                            checked = seSouvenirDeMoi,
+                            onCheckedChange = { seSouvenirDeMoi = it },
+                            colors = CheckboxDefaults.colors(checkedColor = bleuPrimaire)
                         )
                         Text("Se souvenir de moi", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    if (error != null) {
+                    if (erreur != null) {
                         Text(
-                            text = error!!,
+                            text = erreur!!,
                             color = Color.Red,
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.padding(vertical = 8.dp)
@@ -182,10 +197,10 @@ fun LoginScreen(
                     Spacer(modifier = Modifier.height(24.dp))
 
                     Button(
-                        onClick = { viewModel.login(email, password, onLoginSuccess) },
+                        onClick = { modeleDeVue.seConnecter(courriel, motDePasse, lorsSuccesConnexion) },
                         modifier = Modifier.fillMaxWidth().height(56.dp),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = primaryBlue)
+                        colors = ButtonDefaults.buttonColors(containerColor = bleuPrimaire)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("Se connecter", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -200,14 +215,14 @@ fun LoginScreen(
 
                     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("Vous n'avez pas encore de compte ?", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        TextButton(onClick = onNavigateToRegister) {
-                            Text("S'inscrire", color = primaryBlue, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        TextButton(onClick = lorsNavigationVersInscription) {
+                            Text("S'inscrire", color = bleuPrimaire, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(maxOf(16.dp, screenHeight * 0.05f)))
+            Spacer(modifier = Modifier.height(32.dp))
             Text(
                 "Système de gestion logistique\nLogistics Pro",
                 style = MaterialTheme.typography.labelSmall,

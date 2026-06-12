@@ -52,13 +52,13 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
         setContent {
-            val isDarkMode by authViewModel.isDarkMode.collectAsState()
+            val isDarkMode by authViewModel.estModeSombre.collectAsState()
             
             FrontkotlinTheme(darkTheme = isDarkMode) {
                 val navController = rememberNavController()
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentDestination = navBackStackEntry?.destination
-                val user by authViewModel.user.collectAsState()
+                val user by authViewModel.utilisateur.collectAsState()
                 val isDriver = user?.isDriver() == true
 
                 Scaffold(

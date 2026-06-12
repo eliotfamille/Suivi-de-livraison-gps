@@ -16,6 +16,10 @@ interface ApiService {
     suspend fun login(@Body request: LoginRequest): Response<AuthResponse>
 
     @Headers("Accept: application/json")
+    @POST("api/auth/reset-password")
+    suspend fun resetPassword(@Body body: Map<String, String>): Response<Unit>
+
+    @Headers("Accept: application/json")
     @POST("api/auth/logout")
     suspend fun logout(@Header("Authorization") token: String): Response<Unit>
 

@@ -47,50 +47,49 @@ import java.io.FileOutputStream
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
-    val user by viewModel.user.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    val context = LocalContext.current
-    val primaryBlue = MaterialTheme.colorScheme.primary
+fun EcranProfil(modeleDeVue: AuthViewModel, lorsDeconnexion: () -> Unit) {
+    val utilisateur by modeleDeVue.utilisateur.collectAsState()
+    val estEnChargement by modeleDeVue.estEnChargement.collectAsState()
+    val contexte = LocalContext.current
 
-    val getImageUrl: (String?) -> String? = { path ->
-        if (path.isNullOrBlank()) null
-        else if (path.startsWith("http") || path.startsWith("data:image")) path
+    val obtenirUrlImage: (String?) -> String? = { chemin ->
+        if (chemin.isNullOrBlank()) null
+        else if (chemin.startsWith("http") || chemin.startsWith("data:image")) chemin
         else {
-            val cleanPath = path.removePrefix("/")
-            val finalPath = if (cleanPath.startsWith("storage/")) cleanPath else "storage/$cleanPath"
-            "${RetrofitClient.BASE_URL.removeSuffix("/")}/$finalPath"
+            val cheminPropre = chemin.removePrefix("/")
+            val cheminFinal = if (cheminPropre.startsWith("storage/")) cheminPropre else "storage/$cheminPropre"
+            "${RetrofitClient.BASE_URL.removeSuffix("/")}/$cheminFinal"
         }
     }
     
-    var showAddressDialog by remember { mutableStateOf<String?>(null) } // "domicile" or "bureau"
-    var addressText by remember { mutableStateOf("") }
-    var selectedGeoPoint by remember { mutableStateOf<GeoPoint?>(null) }
-    var showMap by remember { mutableStateOf(false) }
+    var dialogueAdressePar by remember { mutableStateOf<String?>(null) } // "domicile" ou "bureau"
+    var texteAdresse by remember { mutableStateOf("") }
+    var pointGeoSelectionne by remember { mutableStateOf<GeoPoint?>(null) }
+    var afficherCarte by remember { mutableStateOf(false) }
     
-    var showPersonalDialog by remember { mutableStateOf(false) }
-    var editName by remember { mutableStateOf("") }
-    var editPhone by remember { mutableStateOf("") }
+    var dialoguePersonnelActif by remember { mutableStateOf(false) }
+    var nomEdition by remember { mutableStateOf("") }
+    var telephoneEdition by remember { mutableStateOf("") }
 
-    var showVehicleDialog by remember { mutableStateOf(false) }
-    var editVehicleType by remember { mutableStateOf("") }
-    var editVehicleModel by remember { mutableStateOf("") }
-    var editVehiclePlate by remember { mutableStateOf("") }
+    var dialogueVehiculeActif by remember { mutableStateOf(false) }
+    var typeVehiculeEdition by remember { mutableStateOf("") }
+    var modeleVehiculeEdition by remember { mutableStateOf("") }
+    var plaqueVehiculeEdition by remember { mutableStateOf("") }
 
-    val imagePickerLauncher = rememberLauncherForActivityResult(
+    val lanceurSelectionImage = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         uri?.let {
-            val file = uriToFile(context, it)
-            if (file != null) {
-                viewModel.updateProfile(imageFile = file)
+            val fichier = uriVersFichier(contexte, it)
+            if (fichier != null) {
+                modeleDeVue.mettreAJourProfil(fichierImage = fichier)
             }
         }
     }
 
-    if (showMap) {
+    if (afficherCarte) {
         AlertDialog(
-            onDismissRequest = { showMap = false },
+            onDismissRequest = { afficherCarte = false },
             title = { Text("Choisir sur la carte") },
             text = {
                 Box(modifier = Modifier.fillMaxWidth().height(300.dp)) {
@@ -102,57 +101,57 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
                                 setTileSource(TileSourceFactory.MAPNIK)
                                 setMultiTouchControls(true)
                                 controller.setZoom(12.0)
-                                controller.setCenter(selectedGeoPoint ?: GeoPoint(-18.8792, 47.5079))
+                                controller.setCenter(pointGeoSelectionne ?: GeoPoint(-18.8792, 47.5079))
                                 
-                                val locationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(ctx), this)
-                                locationOverlay.enableMyLocation()
-                                overlays.add(locationOverlay)
+                                val coucheLocalisation = MyLocationNewOverlay(GpsMyLocationProvider(ctx), this)
+                                coucheLocalisation.enableMyLocation()
+                                overlays.add(coucheLocalisation)
 
-                                val overlay = MapEventsOverlay(object : MapEventsReceiver {
+                                val overlayEvenements = MapEventsOverlay(object : MapEventsReceiver {
                                     override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
-                                        selectedGeoPoint = p
-                                        addressText = "Position choisie (${String.format("%.4f", p.latitude)})"
+                                        pointGeoSelectionne = p
+                                        texteAdresse = "Position choisie"
                                         invalidate()
                                         return true
                                     }
                                     override fun longPressHelper(p: GeoPoint): Boolean = false
                                 })
-                                overlays.add(overlay)
+                                overlays.add(overlayEvenements)
                             }
                         },
-                        update = { mapView ->
-                            mapView.overlays.removeAll { it is Marker }
-                            selectedGeoPoint?.let {
-                                val marker = Marker(mapView)
-                                marker.position = it
-                                marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                                mapView.overlays.add(marker)
+                        update = { vueCarte ->
+                            vueCarte.overlays.removeAll { it is Marker }
+                            pointGeoSelectionne?.let {
+                                val marqueur = Marker(vueCarte)
+                                marqueur.position = it
+                                marqueur.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                                vueCarte.overlays.add(marqueur)
                             }
                         }
                     )
                 }
             },
-            confirmButton = { Button(onClick = { showMap = false }) { Text("Valider") } }
+            confirmButton = { Button(onClick = { afficherCarte = false }) { Text("Valider") } }
         )
     }
 
-    if (showPersonalDialog) {
+    if (dialoguePersonnelActif) {
         AlertDialog(
-            onDismissRequest = { showPersonalDialog = false },
+            onDismissRequest = { dialoguePersonnelActif = false },
             title = { Text("Modifier mes infos") },
             text = {
                 Column {
                     OutlinedTextField(
-                        value = editName,
-                        onValueChange = { editName = it.replace("\n", "") },
+                        value = nomEdition,
+                        onValueChange = { nomEdition = it.replace("\n", "") },
                         label = { Text("Nom") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
-                        value = editPhone,
-                        onValueChange = { editPhone = it.replace("\n", "") },
+                        value = telephoneEdition,
+                        onValueChange = { telephoneEdition = it.replace("\n", "") },
                         label = { Text("Téléphone") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
@@ -161,39 +160,39 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
             },
             confirmButton = {
                 Button(onClick = {
-                    viewModel.updateProfile(name = editName, phone = editPhone)
-                    showPersonalDialog = false
+                    modeleDeVue.mettreAJourProfil(nom = nomEdition, telephone = telephoneEdition)
+                    dialoguePersonnelActif = false
                 }) { Text("Enregistrer") }
             },
-            dismissButton = { TextButton(onClick = { showPersonalDialog = false }) { Text("Annuler") } }
+            dismissButton = { TextButton(onClick = { dialoguePersonnelActif = false }) { Text("Annuler") } }
         )
     }
 
-    if (showVehicleDialog) {
+    if (dialogueVehiculeActif) {
         AlertDialog(
-            onDismissRequest = { showVehicleDialog = false },
+            onDismissRequest = { dialogueVehiculeActif = false },
             title = { Text("Modifier le véhicule") },
             text = {
                 Column {
                     OutlinedTextField(
-                        value = editVehicleType,
-                        onValueChange = { editVehicleType = it },
+                        value = typeVehiculeEdition,
+                        onValueChange = { typeVehiculeEdition = it },
                         label = { Text("Type de véhicule") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
-                        value = editVehicleModel,
-                        onValueChange = { editVehicleModel = it },
+                        value = modeleVehiculeEdition,
+                        onValueChange = { modeleVehiculeEdition = it },
                         label = { Text("Modèle") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
-                        value = editVehiclePlate,
-                        onValueChange = { editVehiclePlate = it },
+                        value = plaqueVehiculeEdition,
+                        onValueChange = { plaqueVehiculeEdition = it },
                         label = { Text("Immatriculation") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
@@ -202,39 +201,39 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
             },
             confirmButton = {
                 Button(onClick = {
-                    viewModel.updateProfile(
-                        vehicle_type = editVehicleType,
-                        vehicle_model = editVehicleModel,
-                        vehicle_plate = editVehiclePlate
+                    modeleDeVue.mettreAJourProfil(
+                        type_vehicule = typeVehiculeEdition,
+                        modele_vehicule = modeleVehiculeEdition,
+                        plaque_vehicule = plaqueVehiculeEdition
                     )
-                    showVehicleDialog = false
+                    dialogueVehiculeActif = false
                 }) { Text("Enregistrer") }
             },
-            dismissButton = { TextButton(onClick = { showVehicleDialog = false }) { Text("Annuler") } }
+            dismissButton = { TextButton(onClick = { dialogueVehiculeActif = false }) { Text("Annuler") } }
         )
     }
 
-    if (showAddressDialog != null) {
+    if (dialogueAdressePar != null) {
         AlertDialog(
-            onDismissRequest = { showAddressDialog = null },
-            title = { Text("Modifier l'adresse ${if (showAddressDialog == "domicile") "domicile" else "bureau"}") },
+            onDismissRequest = { dialogueAdressePar = null },
+            title = { Text("Modifier l'adresse ${if (dialogueAdressePar == "domicile") "domicile" else "bureau"}") },
             text = {
                 Column {
                     OutlinedTextField(
-                        value = addressText,
-                        onValueChange = { addressText = it.replace("\n", "").replace("\r", "") },
+                        value = texteAdresse,
+                        onValueChange = { texteAdresse = it.replace("\n", "").replace("\r", "") },
                         label = { Text("Adresse") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         trailingIcon = {
-                            IconButton(onClick = { showMap = true }) {
+                            IconButton(onClick = { afficherCarte = true }) {
                                 Icon(Icons.Default.Map, contentDescription = "Carte")
                             }
                         }
                     )
-                    if (selectedGeoPoint != null) {
+                    if (pointGeoSelectionne != null) {
                         Text(
-                            "Coordonnées : ${String.format("%.4f", selectedGeoPoint!!.latitude)}, ${String.format("%.4f", selectedGeoPoint!!.longitude)}",
+                            "Coordonnées : ${String.format("%.4f", pointGeoSelectionne!!.latitude)}, ${String.format("%.4f", pointGeoSelectionne!!.longitude)}",
                             style = MaterialTheme.typography.labelSmall,
                             color = Color.Gray,
                             modifier = Modifier.padding(top = 4.dp)
@@ -244,18 +243,18 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
             },
             confirmButton = {
                 Button(onClick = {
-                    if (showAddressDialog == "domicile") {
-                        viewModel.updateProfile(domicile = addressText, domicile_lat = selectedGeoPoint?.latitude, domicile_lng = selectedGeoPoint?.longitude)
+                    if (dialogueAdressePar == "domicile") {
+                        modeleDeVue.mettreAJourProfil(domicile = texteAdresse, domicile_lat = pointGeoSelectionne?.latitude, domicile_lng = pointGeoSelectionne?.longitude)
                     } else {
-                        viewModel.updateProfile(bureau = addressText, bureau_lat = selectedGeoPoint?.latitude, bureau_lng = selectedGeoPoint?.longitude)
+                        modeleDeVue.mettreAJourProfil(bureau = texteAdresse, bureau_lat = pointGeoSelectionne?.latitude, bureau_lng = pointGeoSelectionne?.longitude)
                     }
-                    showAddressDialog = null
+                    dialogueAdressePar = null
                 }) {
                     Text("Enregistrer")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showAddressDialog = null }) {
+                TextButton(onClick = { dialogueAdressePar = null }) {
                     Text("Annuler")
                 }
             }
@@ -278,8 +277,8 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
         }
     ) { padding ->
         PullToRefreshBox(
-            isRefreshing = isLoading,
-            onRefresh = { viewModel.fetchProfile() },
+            isRefreshing = estEnChargement,
+            onRefresh = { modeleDeVue.recupererProfil() },
             modifier = Modifier.fillMaxSize().padding(padding)
         ) {
             Column(
@@ -290,16 +289,16 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Profile Header
+                // En-tête du profil
                 Box(contentAlignment = Alignment.BottomEnd) {
                     Surface(
-                        modifier = Modifier.size(100.dp).clickable { imagePickerLauncher.launch("image/*") },
+                        modifier = Modifier.size(100.dp).clickable { lanceurSelectionImage.launch("image/*") },
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.surfaceVariant
                     ) {
-                        if (!user?.avatar.isNullOrEmpty()) {
+                        if (!utilisateur?.avatar.isNullOrEmpty()) {
                             AsyncImage(
-                                model = getImageUrl(user?.avatar),
+                                model = obtenirUrlImage(utilisateur?.avatar),
                                 contentDescription = "Avatar",
                                 modifier = Modifier.fillMaxSize().clip(CircleShape),
                                 contentScale = ContentScale.Crop
@@ -309,7 +308,7 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
                         }
                     }
                     Surface(
-                        modifier = Modifier.size(28.dp).clickable { imagePickerLauncher.launch("image/*") },
+                        modifier = Modifier.size(28.dp).clickable { lanceurSelectionImage.launch("image/*") },
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.primary,
                         border = androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.surface)
@@ -319,9 +318,9 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
                 }
                 
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(user?.name ?: "Jean Dupont", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                Text(utilisateur?.name ?: "Jean Dupont", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
 
-                if (user?.isDriver() == true && user?.driver != null) {
+                if (utilisateur?.isDriver() == true && utilisateur?.driver != null) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(top = 4.dp)
@@ -334,25 +333,25 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = String.format("%.1f", user?.driver?.rating ?: 0.0),
+                            text = String.format("%.1f", utilisateur?.driver?.rating ?: 0.0),
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = " (${user?.driver?.rating_count ?: 0} avis)",
+                            text = " (${utilisateur?.driver?.rating_count ?: 0} avis)",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
                 }
 
-                val isClient = user?.role?.equals("client", ignoreCase = true) == true || 
-                               user?.roles?.any { it.equals("client", ignoreCase = true) } == true
-                val roleLabel = if (user?.isDriver() == true) "Livreur" else if (isClient) "Client" else null
+                val estClient = utilisateur?.role?.equals("client", ignoreCase = true) == true || 
+                                utilisateur?.roles?.any { it.equals("client", ignoreCase = true) } == true
+                val libelleRole = if (utilisateur?.isDriver() == true) "Livreur" else if (estClient) "Client" else null
                 
                 Text(
-                    text = roleLabel ?: "Chargement...",
+                    text = libelleRole ?: "Chargement...",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -360,66 +359,66 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
                 Spacer(modifier = Modifier.height(32.dp))
                 
                 // Sections
-                ProfileSection(title = "INFORMATIONS PERSONNELLES", actionText = "Modifier", onAction = {
-                    editName = user?.name ?: ""
-                    editPhone = user?.phone ?: ""
-                    showPersonalDialog = true
+                SectionProfil(titre = "INFORMATIONS PERSONNELLES", texteAction = "Modifier", lorsAction = {
+                    nomEdition = utilisateur?.name ?: ""
+                    telephoneEdition = utilisateur?.phone ?: ""
+                    dialoguePersonnelActif = true
                 }) {
-                    ProfileItem(icon = Icons.Default.Email, label = "Email", value = user?.email ?: "jean.dupont@email.com")
+                    ItemProfil(icone = Icons.Default.Email, libelle = "Email", valeur = utilisateur?.email ?: "jean.dupont@email.com")
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                    ProfileItem(icon = Icons.Default.Phone, label = "Téléphone", value = user?.phone ?: "+33 6 12 34 56 78")
+                    ItemProfil(icone = Icons.Default.Phone, libelle = "Téléphone", valeur = utilisateur?.phone ?: "+33 6 12 34 56 78")
                 }
                 
-                ProfileSection(title = "ADRESSES ENREGISTRÉES") {
-                    AddressItem(
-                        icon = Icons.Default.Home, 
-                        label = "Domicile", 
-                        address = user?.domicile ?: "Non renseigné",
-                        onClick = {
-                            addressText = user?.domicile ?: ""
-                            selectedGeoPoint = if (user?.domicile_lat != null) GeoPoint(user!!.domicile_lat!!, user!!.domicile_lng!!) else null
-                            showAddressDialog = "domicile"
+                SectionProfil(titre = "ADRESSES ENREGISTRÉES") {
+                    ItemAdresse(
+                        icone = Icons.Default.Home, 
+                        libelle = "Domicile", 
+                        adresse = utilisateur?.domicile ?: "Non renseigné",
+                        lorsClic = {
+                            texteAdresse = utilisateur?.domicile ?: ""
+                            pointGeoSelectionne = if (utilisateur?.domicile_lat != null) GeoPoint(utilisateur!!.domicile_lat!!, utilisateur!!.domicile_lng!!) else null
+                            dialogueAdressePar = "domicile"
                         }
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                    AddressItem(
-                        icon = Icons.Default.Work, 
-                        label = "Bureau", 
-                        address = user?.bureau ?: "Non renseigné",
-                        onClick = {
-                            addressText = user?.bureau ?: ""
-                            selectedGeoPoint = if (user?.bureau_lat != null) GeoPoint(user!!.bureau_lat!!, user!!.bureau_lng!!) else null
-                            showAddressDialog = "bureau"
+                    ItemAdresse(
+                        icone = Icons.Default.Work, 
+                        libelle = "Bureau", 
+                        adresse = utilisateur?.bureau ?: "Non renseigné",
+                        lorsClic = {
+                            texteAdresse = utilisateur?.bureau ?: ""
+                            pointGeoSelectionne = if (utilisateur?.bureau_lat != null) GeoPoint(utilisateur!!.bureau_lat!!, utilisateur!!.bureau_lng!!) else null
+                            dialogueAdressePar = "bureau"
                         }
                     )
                 }
 
-                if (user?.isDriver() == true && user?.driver != null) {
-                    ProfileSection(title = "DÉTAILS DU VÉHICULE", actionText = "Modifier", onAction = {
-                        editVehicleType = user?.driver?.vehicle_type ?: ""
-                        editVehicleModel = user?.driver?.vehicle_model ?: ""
-                        editVehiclePlate = user?.driver?.vehicle_plate ?: ""
-                        showVehicleDialog = true
+                if (utilisateur?.isDriver() == true && utilisateur?.driver != null) {
+                    SectionProfil(titre = "DÉTAILS DU VÉHICULE", texteAction = "Modifier", lorsAction = {
+                        typeVehiculeEdition = utilisateur?.driver?.vehicle_type ?: ""
+                        modeleVehiculeEdition = utilisateur?.driver?.vehicle_model ?: ""
+                        plaqueVehiculeEdition = utilisateur?.driver?.vehicle_plate ?: ""
+                        dialogueVehiculeActif = true
                     }) {
-                        ProfileItem(icon = Icons.Default.Category, label = "Type", value = user?.driver?.vehicle_type ?: "Non renseigné")
+                        ItemProfil(icone = Icons.Default.Category, libelle = "Type", valeur = utilisateur?.driver?.vehicle_type ?: "Non renseigné")
                         HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                        ProfileItem(icon = Icons.Default.LocalShipping, label = "Modèle", value = user?.driver?.vehicle_model ?: "Non renseigné")
+                        ItemProfil(icone = Icons.Default.LocalShipping, libelle = "Modèle", valeur = utilisateur?.driver?.vehicle_model ?: "Non renseigné")
                         HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                        ProfileItem(icon = Icons.Default.Badge, label = "Immatriculation", value = user?.driver?.vehicle_plate ?: "Non renseigné")
+                        ItemProfil(icone = Icons.Default.Badge, libelle = "Immatriculation", valeur = utilisateur?.driver?.vehicle_plate ?: "Non renseigné")
                     }
                 }
                 
-                ProfileSection(title = "PRÉFÉRENCES") {
-                    val isDarkMode by viewModel.isDarkMode.collectAsState()
-                    PreferenceItem(icon = Icons.Default.Notifications, label = "Notifications Push", isChecked = true)
+                SectionProfil(titre = "PRÉFÉRENCES") {
+                    val estModeSombre by modeleDeVue.estModeSombre.collectAsState()
+                    ItemPreference(icone = Icons.Default.Notifications, libelle = "Notifications Push", estCoche = true)
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                    PreferenceItem(icon = Icons.Default.AlternateEmail, label = "Emails de suivi", isChecked = false)
+                    ItemPreference(icone = Icons.Default.AlternateEmail, libelle = "Emails de suivi", estCoche = false)
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                    PreferenceItem(
-                        icon = Icons.Default.DarkMode, 
-                        label = "Mode Sombre", 
-                        isChecked = isDarkMode,
-                        onCheckedChange = { viewModel.toggleDarkMode() }
+                    ItemPreference(
+                        icone = Icons.Default.DarkMode, 
+                        libelle = "Mode Sombre", 
+                        estCoche = estModeSombre,
+                        lorsChangementCoche = { modeleDeVue.basculerModeSombre() }
                     )
                 }
                 
@@ -427,8 +426,8 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
                 
                 OutlinedButton(
                     onClick = { 
-                        viewModel.logout()
-                        onLogout()
+                        modeleDeVue.seDeconnecter()
+                        lorsDeconnexion()
                     },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(12.dp),
@@ -449,13 +448,13 @@ fun ProfileScreen(viewModel: AuthViewModel, onLogout: () -> Unit) {
 }
 
 @Composable
-fun ProfileSection(title: String, actionText: String? = null, onAction: () -> Unit = {}, content: @Composable ColumnScope.() -> Unit) {
+fun SectionProfil(titre: String, texteAction: String? = null, lorsAction: () -> Unit = {}, contenu: @Composable ColumnScope.() -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text(title, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 0.5.sp)
-            if (actionText != null) {
-                TextButton(onClick = onAction) {
-                    Text(actionText, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            Text(titre, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 0.5.sp)
+            if (texteAction != null) {
+                TextButton(onClick = lorsAction) {
+                    Text(texteAction, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -467,76 +466,76 @@ fun ProfileSection(title: String, actionText: String? = null, onAction: () -> Un
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
-            Column(content = content)
+            Column(content = contenu)
         }
     }
 }
 
 @Composable
-fun ProfileItem(icon: ImageVector, label: String, value: String) {
+fun ItemProfil(icone: ImageVector, libelle: String, valeur: String) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Surface(modifier = Modifier.size(40.dp), shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
-            Icon(icon, contentDescription = null, modifier = Modifier.padding(8.dp), tint = MaterialTheme.colorScheme.primary)
+            Icon(icone, contentDescription = null, modifier = Modifier.padding(8.dp), tint = MaterialTheme.colorScheme.primary)
         }
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            Text(libelle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(valeur, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
         }
         Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.size(20.dp))
     }
 }
 
 @Composable
-fun AddressItem(icon: ImageVector, label: String, address: String, onClick: () -> Unit = {}) {
+fun ItemAdresse(icone: ImageVector, libelle: String, adresse: String, lorsClic: () -> Unit = {}) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable { onClick() }.padding(16.dp),
+        modifier = Modifier.fillMaxWidth().clickable { lorsClic() }.padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Surface(modifier = Modifier.size(40.dp), shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
-            Icon(icon, contentDescription = null, modifier = Modifier.padding(8.dp), tint = MaterialTheme.colorScheme.primary)
+            Icon(icone, contentDescription = null, modifier = Modifier.padding(8.dp), tint = MaterialTheme.colorScheme.primary)
         }
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-            Text(address, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(libelle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            Text(adresse, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Icon(Icons.Default.MoreVert, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
-fun PreferenceItem(icon: ImageVector, label: String, isChecked: Boolean, onCheckedChange: (Boolean) -> Unit = {}) {
+fun ItemPreference(icone: ImageVector, libelle: String, estCoche: Boolean, lorsChangementCoche: (Boolean) -> Unit = {}) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
+        Icon(icone, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
         Spacer(modifier = Modifier.width(16.dp))
-        Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+        Text(libelle, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
         Switch(
-            checked = isChecked,
-            onCheckedChange = onCheckedChange,
+            checked = estCoche,
+            onCheckedChange = lorsChangementCoche,
             colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.onPrimary, checkedTrackColor = MaterialTheme.colorScheme.primary)
         )
     }
 }
 
-private fun uriToFile(context: android.content.Context, uri: Uri): File? {
-    val cursor = context.contentResolver.query(uri, null, null, null, null) ?: return null
-    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-    cursor.moveToFirst()
-    val name = cursor.getString(nameIndex)
-    cursor.close()
+private fun uriVersFichier(contexte: android.content.Context, uri: Uri): File? {
+    val curseur = contexte.contentResolver.query(uri, null, null, null, null) ?: return null
+    val indexNom = curseur.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+    curseur.moveToFirst()
+    val nom = curseur.getString(indexNom)
+    curseur.close()
     
-    val file = File(context.cacheDir, name)
-    val inputStream = context.contentResolver.openInputStream(uri) ?: return null
-    val outputStream = FileOutputStream(file)
-    inputStream.copyTo(outputStream)
-    inputStream.close()
-    outputStream.close()
-    return file
+    val fichier = File(contexte.cacheDir, nom)
+    val fluxEntree = contexte.contentResolver.openInputStream(uri) ?: return null
+    val fluxSortie = FileOutputStream(fichier)
+    fluxEntree.copyTo(fluxSortie)
+    fluxEntree.close()
+    fluxSortie.close()
+    return fichier
 }

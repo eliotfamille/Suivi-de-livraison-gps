@@ -1,11 +1,9 @@
 package com.nenykely.front_kotlin.viewmodel
 
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nenykely.front_kotlin.data.DeliveryRepository
 import com.nenykely.front_kotlin.data.models.*
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -13,267 +11,258 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 
 class DeliveryViewModel(application: android.app.Application) : AndroidViewModel(application) {
-    private val repository: DeliveryRepository = DeliveryRepository(application)
+    private val depot: DeliveryRepository = DeliveryRepository(application)
 
-    private val _deliveries = MutableStateFlow<List<Delivery>>(emptyList())
-    val deliveries = _deliveries.asStateFlow()
+    private val _livraisons = MutableStateFlow<List<Delivery>>(emptyList())
+    val livraisons = _livraisons.asStateFlow()
 
-    private val _currentDelivery = MutableStateFlow<Delivery?>(null)
-    val currentDelivery = _currentDelivery.asStateFlow()
+    private val _livraisonActuelle = MutableStateFlow<Delivery?>(null)
+    val livraisonActuelle = _livraisonActuelle.asStateFlow()
 
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading = _isLoading.asStateFlow()
+    private val _estEnChargement = MutableStateFlow(false)
+    val estEnChargement = _estEnChargement.asStateFlow()
 
-    private val _users = MutableStateFlow<List<User>>(emptyList())
-    val users = _users.asStateFlow()
+    private val _utilisateurs = MutableStateFlow<List<User>>(emptyList())
+    val utilisateurs = _utilisateurs.asStateFlow()
 
-    private val _isSharingLocation = MutableStateFlow(false)
-    val isSharingLocation = _isSharingLocation.asStateFlow()
+    private val _partageLocalisation = MutableStateFlow(false)
+    val partageLocalisation = _partageLocalisation.asStateFlow()
 
-    private val _proofPhoto = MutableStateFlow<File?>(null)
-    val proofPhoto = _proofPhoto.asStateFlow()
+    private val _photoPreuve = MutableStateFlow<File?>(null)
+    val photoPreuve = _photoPreuve.asStateFlow()
 
-    private val _error = MutableStateFlow<String?>(null)
-    val error = _error.asStateFlow()
+    private val _erreur = MutableStateFlow<String?>(null)
+    val erreur = _erreur.asStateFlow()
 
-    private var lastLat: Double? = null
-    private var lastLng: Double? = null
+    private var derniereLat: Double? = null
+    private var derniereLng: Double? = null
 
-    fun setProofPhoto(file: File?) {
-        _proofPhoto.value = file
+    fun definirPhotoPreuve(fichier: File?) {
+        _photoPreuve.value = fichier
     }
 
-    fun fetchDeliveries(token: String) {
-        if (token.isBlank()) return
+    fun recupererLivraisons(jeton: String) {
+        if (jeton.isBlank()) return
         viewModelScope.launch {
-            _isLoading.value = true
+            _estEnChargement.value = true
             try {
-                val response = repository.getDeliveries(token)
-                if (response.isSuccessful) {
-                    _deliveries.value = response.body() ?: emptyList()
-                } else if (response.code() == 401) {
-                    _error.value = "Session expirée"
+                val reponse = depot.getDeliveries(jeton)
+                if (reponse.isSuccessful) {
+                    _livraisons.value = reponse.body() ?: emptyList()
+                } else if (reponse.code() == 401) {
+                    _erreur.value = "Session expirée"
                 }
             } catch (e: Exception) {
-                android.util.Log.e("DeliveryViewModel", "Fetch error: ${e.message}")
+                android.util.Log.e("DeliveryViewModel", "Erreur de récupération : ${e.message}")
             } finally {
-                _isLoading.value = false
+                _estEnChargement.value = false
             }
         }
     }
 
-    fun searchUsers(token: String, query: String) {
+    fun rechercherUtilisateurs(jeton: String, requete: String) {
         viewModelScope.launch {
             try {
-                val response = repository.getUsers(token, query)
-                if (response.isSuccessful) {
-                    _users.value = response.body() ?: emptyList()
+                val reponse = depot.getUsers(jeton, requete)
+                if (reponse.isSuccessful) {
+                    _utilisateurs.value = reponse.body() ?: emptyList()
                 }
             } catch (e: Exception) {
-                android.util.Log.e("DeliveryViewModel", "Search error: ${e.message}")
+                android.util.Log.e("DeliveryViewModel", "Erreur de recherche : ${e.message}")
             }
         }
     }
 
-    fun fetchTracking(token: String, deliveryId: Int) {
+    fun recupererSuivi(jeton: String, livraisonId: Int) {
         viewModelScope.launch {
-            _isLoading.value = true
+            _estEnChargement.value = true
             try {
-                val response = repository.getDelivery(token, deliveryId)
-                if (response.isSuccessful) {
-                    _currentDelivery.value = response.body()
+                val reponse = depot.getDelivery(jeton, livraisonId)
+                if (reponse.isSuccessful) {
+                    _livraisonActuelle.value = reponse.body()
                 }
             } catch (e: Exception) {
-                android.util.Log.e("DeliveryViewModel", "Tracking error: ${e.message}")
+                android.util.Log.e("DeliveryViewModel", "Erreur de suivi : ${e.message}")
             } finally {
-                _isLoading.value = false
+                _estEnChargement.value = false
             }
         }
     }
 
-    fun submitDelivery(token: String, data: Map<String, Any?>, onResult: (String) -> Unit) {
+    fun soumettreLivraison(jeton: String, donnees: Map<String, Any?>, lorsResultat: (String) -> Unit) {
         viewModelScope.launch {
-            _isLoading.value = true
+            _estEnChargement.value = true
             try {
                 val req = StoreDeliveryRequest(
-                    description = data["description"] as String,
-                    weight_kg = data["weight_kg"] as Double,
-                    recipient_name = data["recipient_name"] as String,
-                    recipient_phone = data["recipient_phone"] as String,
-                    recipient_address = data["recipient_address"] as String,
-                    recipient_lat = data["recipient_lat"] as Double,
-                    recipient_lng = data["recipient_lng"] as Double,
-                    sender_name = data["sender_name"] as String,
-                    sender_phone = data["sender_phone"] as String,
-                    sender_address = data["sender_address"] as String,
-                    sender_lat = data["sender_lat"] as Double,
-                    sender_lng = data["sender_lng"] as Double
+                    description = donnees["description"] as String,
+                    weight_kg = donnees["weight_kg"] as Double,
+                    recipient_name = donnees["recipient_name"] as String,
+                    recipient_phone = donnees["recipient_phone"] as String,
+                    recipient_address = donnees["recipient_address"] as String,
+                    recipient_lat = donnees["recipient_lat"] as Double,
+                    recipient_lng = donnees["recipient_lng"] as Double,
+                    sender_name = donnees["sender_name"] as String,
+                    sender_phone = donnees["sender_phone"] as String,
+                    sender_address = donnees["sender_address"] as String,
+                    sender_lat = donnees["sender_lat"] as Double,
+                    sender_lng = donnees["sender_lng"] as Double
                 )
-                val response = repository.storeDelivery(token, req)
-                if (response.isSuccessful) {
-                    fetchDeliveries(token)
-                    onResult("Livraison enregistrée avec succès")
+                val reponse = depot.storeDelivery(jeton, req)
+                if (reponse.isSuccessful) {
+                    recupererLivraisons(jeton)
+                    lorsResultat("Livraison enregistrée avec succès")
                 } else {
-                    onResult("Erreur lors de l'enregistrement: ${response.code()}")
+                    lorsResultat("Erreur lors de l'enregistrement : ${reponse.code()}")
                 }
             } catch (e: Exception) {
-                onResult("Erreur de connexion: ${e.message}")
+                lorsResultat("Erreur de connexion : ${e.message}")
             } finally {
-                _isLoading.value = false
+                _estEnChargement.value = false
             }
         }
     }
 
-    fun acceptDelivery(token: String, deliveryId: Int, onSuccess: () -> Unit) {
+    fun accepterLivraison(jeton: String, livraisonId: Int, lorsSucces: () -> Unit) {
         viewModelScope.launch {
             try {
-                val response = repository.acceptDelivery(token, deliveryId)
-                if (response.isSuccessful) {
-                    fetchDeliveries(token)
-                    onSuccess()
+                val reponse = depot.acceptDelivery(jeton, livraisonId)
+                if (reponse.isSuccessful) {
+                    recupererLivraisons(jeton)
+                    lorsSucces()
                 } else {
-                    android.util.Log.e("DELIVERY_TEST", "Error accept: ${response.code()}")
-                    if (response.code() == 401) _error.value = "Erreur d'authentification (401)"
+                    if (reponse.code() == 401) _erreur.value = "Erreur d'authentification (401)"
                 }
             } catch (e: Exception) {
-                android.util.Log.e("DELIVERY_TEST", "Exception acceptDelivery: ${e.message}")
+                android.util.Log.e("DeliveryViewModel", "Erreur acceptation : ${e.message}")
             }
         }
     }
 
-    fun updateStatus(
-        token: String, 
-        deliveryId: Int, 
-        status: String, 
+    fun mettreAJourStatut(
+        jeton: String, 
+        livraisonId: Int, 
+        statut: String, 
         lat: Double? = null,
         lng: Double? = null,
-        photoFile: File? = null,
+        fichierPhoto: File? = null,
         signatureBase64: String? = null,
-        onSuccess: () -> Unit = {}
+        lorsSucces: () -> Unit = {}
     ) {
-        val finalLat = lat ?: lastLat
-        val finalLng = lng ?: lastLng
+        val latFinale = lat ?: derniereLat
+        val lngFinale = lng ?: derniereLng
 
         viewModelScope.launch {
-            _isLoading.value = true
-            _error.value = null
+            _estEnChargement.value = true
+            _erreur.value = null
             try {
-                val response = if (photoFile != null || !signatureBase64.isNullOrBlank()) {
-                    val statusRB = status.toRequestBody("text/plain".toMediaTypeOrNull())
-                    val latRB = finalLat?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
-                    val lngRB = finalLng?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
+                val reponse = if (fichierPhoto != null || !signatureBase64.isNullOrBlank()) {
+                    val statutRB = statut.toRequestBody("text/plain".toMediaTypeOrNull())
+                    val latRB = latFinale?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
+                    val lngRB = lngFinale?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
                     val noteRB = "Mise à jour via application".toRequestBody("text/plain".toMediaTypeOrNull())
-                    
-                    // ON ENVOIE LA SIGNATURE EN TANT QUE STRING (Base64) car le serveur l'exige
                     val signatureRB = signatureBase64?.toRequestBody("text/plain".toMediaTypeOrNull())
 
-                    val photoPart = photoFile?.let {
+                    val partiePhoto = fichierPhoto?.let {
                         MultipartBody.Part.createFormData(
                             "proof_photo", it.name,
                             it.asRequestBody("image/*".toMediaTypeOrNull())
                         )
                     }
                     
-                    repository.updateDeliveryStatusMultipart(token, deliveryId, statusRB, signatureRB, latRB, lngRB, noteRB, photoPart)
+                    depot.updateDeliveryStatusMultipart(jeton, livraisonId, statutRB, signatureRB, latRB, lngRB, noteRB, partiePhoto)
                 } else {
-                    val body = mutableMapOf<String, String?>(
-                        "status" to status,
-                        "latitude" to finalLat?.toString(),
-                        "longitude" to finalLng?.toString()
+                    val corps = mutableMapOf<String, String?>(
+                        "status" to statut,
+                        "latitude" to latFinale?.toString(),
+                        "longitude" to lngFinale?.toString()
                     )
-                    repository.updateDeliveryStatus(token, deliveryId, body)
+                    depot.updateDeliveryStatus(jeton, livraisonId, corps)
                 }
                 
-                if (response.isSuccessful) {
-                    _currentDelivery.value = response.body()
-                    onSuccess()
+                if (reponse.isSuccessful) {
+                    _livraisonActuelle.value = reponse.body()
+                    lorsSucces()
                 } else {
-                    val errorBody = response.errorBody()?.string()
-                    android.util.Log.e("DELIVERY_ERROR", "Code ${response.code()}: $errorBody")
-                    _error.value = "Erreur ${response.code()}: Vérifiez la validation serveur"
+                    _erreur.value = "Erreur ${reponse.code()} : Vérifiez la validation serveur"
                 }
             } catch (e: Exception) {
-                _error.value = "Erreur connexion"
+                _erreur.value = "Erreur de connexion"
             } finally {
-                _isLoading.value = false
+                _estEnChargement.value = false
             }
         }
     }
 
-    fun rateDelivery(token: String, deliveryId: Int, rating: Int, onSuccess: () -> Unit = {}) {
+    fun noterLivraison(jeton: String, livraisonId: Int, note: Int, lorsSucces: () -> Unit = {}) {
         viewModelScope.launch {
-            _isLoading.value = true
+            _estEnChargement.value = true
             try {
-                val response = repository.rateDelivery(token, deliveryId, rating)
-                if (response.isSuccessful) {
-                    fetchTracking(token, deliveryId)
-                    onSuccess()
+                val reponse = depot.rateDelivery(jeton, livraisonId, note)
+                if (reponse.isSuccessful) {
+                    recupererSuivi(jeton, livraisonId)
+                    lorsSucces()
                 }
             } catch (e: Exception) {
-                android.util.Log.e("DELIVERY_TEST", "Erreur rating: ${e.message}")
+                android.util.Log.e("DeliveryViewModel", "Erreur notation : ${e.message}")
             } finally {
-                _isLoading.value = false
+                _estEnChargement.value = false
             }
         }
     }
 
-    fun updateLocation(token: String, lat: Double, lng: Double) {
-        if (token.isBlank() || lat == 0.0) return
-        lastLat = lat
-        lastLng = lng
+    fun mettreAJourLocalisation(jeton: String, lat: Double, lng: Double) {
+        if (jeton.isBlank() || lat == 0.0) return
+        derniereLat = lat
+        derniereLng = lng
         viewModelScope.launch {
             try {
-                val response = repository.updateDriverLocation(token, lat, lng)
-                if (!response.isSuccessful) {
-                    android.util.Log.e("DeliveryViewModel", "Location update failed: ${response.code()} ${response.errorBody()?.string()}")
-                } else {
-                    android.util.Log.d("DeliveryViewModel", "Location updated successfully: $lat, $lng")
+                val reponse = depot.updateDriverLocation(jeton, lat, lng)
+                if (!reponse.isSuccessful) {
+                    android.util.Log.e("DeliveryViewModel", "Mise à jour localisation échouée : ${reponse.code()}")
                 }
             } catch (e: Exception) {
-                android.util.Log.e("DeliveryViewModel", "Location update error: ${e.message}")
+                android.util.Log.e("DeliveryViewModel", "Erreur localisation : ${e.message}")
             }
         }
     }
 
-    fun downloadReceipt(context: android.content.Context, token: String, deliveryId: Int, fileName: String) {
+    fun telechargerRecu(contexte: android.content.Context, jeton: String, livraisonId: Int, nomFichier: String) {
         viewModelScope.launch {
             try {
-                val response = repository.downloadReceipt(token, deliveryId)
-                if (response.isSuccessful) {
-                    val body = response.body()
-                    if (body != null) {
-                        val file = File(context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS), fileName)
-                        val inputStream = body.byteStream()
-                        val outputStream = FileOutputStream(file)
-                        val buffer = ByteArray(4096)
-                        var read: Int
-                        while (inputStream.read(buffer).also { read = it } != -1) {
-                            outputStream.write(buffer, 0, read)
+                val reponse = depot.downloadReceipt(jeton, livraisonId)
+                if (reponse.isSuccessful) {
+                    val corps = reponse.body()
+                    if (corps != null) {
+                        val fichier = File(contexte.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS), nomFichier)
+                        val fluxEntree = corps.byteStream()
+                        val fluxSortie = FileOutputStream(fichier)
+                        val tampon = ByteArray(4096)
+                        var lu: Int
+                        while (fluxEntree.read(tampon).also { lu = it } != -1) {
+                            fluxSortie.write(tampon, 0, lu)
                         }
-                        outputStream.flush()
-                        outputStream.close()
-                        inputStream.close()
+                        fluxSortie.flush()
+                        fluxSortie.close()
+                        fluxEntree.close()
                         
-                        // Open the file after download
                         val uri = androidx.core.content.FileProvider.getUriForFile(
-                            context,
-                            "${context.packageName}.provider",
-                            file
+                            contexte,
+                            "${contexte.packageName}.provider",
+                            fichier
                         )
-                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                        val intention = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
                             setDataAndType(uri, "application/pdf")
                             flags = android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_ACTIVITY_NEW_TASK
                         }
-                        context.startActivity(intent)
+                        contexte.startActivity(intention)
                     }
                 }
             } catch (e: Exception) {
-                android.util.Log.e("DeliveryViewModel", "Download error: ${e.message}")
+                android.util.Log.e("DeliveryViewModel", "Erreur téléchargement : ${e.message}")
             }
         }
     }

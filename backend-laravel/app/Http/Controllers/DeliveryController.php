@@ -8,46 +8,47 @@ use App\Models\Package;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class DeliveryController extends Controller
 {
     /**
-     * GET /api/deliveries — Liste des livraisons selon le rôle
+     * GET /api/deliveries — Liste des livraisons selon le rôle de l'utilisateur
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $requete): JsonResponse
     {
-        $user = $request->user();
+        $utilisateur = $requete->user();
 
-        $query = Delivery::with(['order.package', 'driver.user', 'statuses']);
+        $constructionRequete = Delivery::with(['order.package', 'driver.user', 'statuses']);
 
         // Si l'utilisateur est un client, il ne voit que ses commandes
-        if ($user->hasRole('client')) {
-            $query->whereHas('order', function($q) use ($user) {
-                $q->where('client_id', $user->id);
+        if ($utilisateur->hasRole('client')) {
+            $constructionRequete->whereHas('order', function($q) use ($utilisateur) {
+                $q->where('client_id', $utilisateur->id);
             });
         }
-        // Si c'est un livreur, il voit les missions disponibles (en attente) OU celles qui lui sont assignées
-        elseif ($user->hasRole('driver')) {
-            $query->where(function($q) use ($user) {
+        // Si c'est un livreur, il voit les missions disponibles (en attente) OU celles qui lui sont déjà assignées
+        elseif ($utilisateur->hasRole('driver')) {
+            $constructionRequete->where(function($q) use ($utilisateur) {
                 $q->where('status', 'pending')
-                  ->orWhere('driver_id', $user->driver->id ?? null);
+                  ->orWhere('driver_id', $utilisateur->driver->id ?? null);
             });
         }
 
-        $deliveries = $query->latest()->get();
+        $livraisons = $constructionRequete->latest()->get();
 
-        return response()->json($deliveries->map(fn($d) => $this->deliveryResource($d)));
+        return response()->json($livraisons->map(fn($l) => $this->ressourceLivraison($l)));
     }
 
     /**
-     * POST /api/deliveries — Création d'une livraison
+     * POST /api/deliveries — Création d'une nouvelle livraison
      */
-    public function store(Request $request): JsonResponse
+    public function store(Request $requete): JsonResponse
     {
-        // LOG ÉTAPE 2 : Réception par Laravel
-        \Log::info("Laravel a reçu une demande de création : ", $request->all());
+        // LOG ÉTAPE 2 : Réception de la demande par le backend
+        Log::info("Demande de création de livraison reçue : ", $requete->all());
 
-        $request->validate([
+        $requete->validate([
             'description'       => 'required|string',
             'recipient_name'    => 'required|string',
             'recipient_phone'   => 'required|string',
@@ -57,223 +58,236 @@ class DeliveryController extends Controller
             'sender_address'    => 'required|string',
         ]);
 
-        $delivery = DB::transaction(function () use ($request) {
-            // LOG ÉTAPE 3 : Début enregistrement BDD
-            \Log::info("Enregistrement en base de données pour l'utilisateur ID: " . $request->user()->id);
+        $livraison = DB::transaction(function () use ($requete) {
+            // LOG ÉTAPE 3 : Début du traitement en base de données
+            Log::info("Enregistrement en BDD pour l'utilisateur ID : " . $requete->user()->id);
 
-            // GESTION ZONES ET TARIFICATION
-            $zones = [
+            // GESTION DES ZONES ET TARIFICATION
+            $zonesTarifaires = [
                 'Zone Urbaine'   => 5.00,
                 'Zone Suburbaine' => 10.00,
                 'Zone Rurale'    => 20.00
             ];
 
-            // Logique de tarification simple basée sur le texte de l'adresse ou la zone envoyée
-            $zone = $request->zone ?? 'Zone Urbaine';
-            $fee  = $zones[$zone] ?? 5.00;
+            // Logique de tarification basée sur la zone fournie ou par défaut
+            $zone = $requete->zone ?? 'Zone Urbaine';
+            $frais = $zonesTarifaires[$zone] ?? 5.00;
 
-            $package = Package::create([
-                'description' => $request->description,
-                'weight_kg'   => $request->weight_kg ?? 0,
-                'created_by'  => $request->user()->id,
+            $colis = Package::create([
+                'description' => $requete->description,
+                'weight_kg'   => $requete->weight_kg ?? 0,
+                'created_by'  => $requete->user()->id,
             ]);
 
-            $order = Order::create([
-                'client_id'         => $request->user()->id,
-                'package_id'        => $package->id,
-                'sender_name'       => $request->sender_name,
-                'sender_phone'      => $request->sender_phone,
-                'sender_address'    => $request->sender_address,
-                'sender_lat'        => $request->sender_lat,
-                'sender_lng'        => $request->sender_lng,
-                'recipient_name'    => $request->recipient_name,
-                'recipient_phone'   => $request->recipient_phone,
-                'recipient_address' => $request->recipient_address,
+            $commande = Order::create([
+                'client_id'         => $requete->user()->id,
+                'package_id'        => $colis->id,
+                'sender_name'       => $requete->sender_name,
+                'sender_phone'      => $requete->sender_phone,
+                'sender_address'    => $requete->sender_address,
+                'sender_lat'        => $requete->sender_lat,
+                'sender_lng'        => $requete->sender_lng,
+                'recipient_name'    => $requete->recipient_name,
+                'recipient_phone'   => $requete->recipient_phone,
+                'recipient_address' => $requete->recipient_address,
                 'zone'              => $zone,
-                'recipient_lat'     => $request->recipient_lat,
-                'recipient_lng'     => $request->recipient_lng,
-                'delivery_fee'      => $fee,
+                'recipient_lat'     => $requete->recipient_lat,
+                'recipient_lng'     => $requete->recipient_lng,
+                'delivery_fee'      => $frais,
             ]);
 
-            $delivery = Delivery::create([
-                'order_id' => $order->id,
+            $livraison = Delivery::create([
+                'order_id' => $commande->id,
                 'status'   => 'pending',
             ]);
 
-            $delivery->statuses()->create([
+            $livraison->statuses()->create([
                 'status' => 'pending',
                 'label'  => 'Commande créée',
-                'note'   => 'En attente de prise en charge.',
-                'lat'    => $request->sender_lat,
-                'lng'    => $request->sender_lng,
+                'note'   => 'En attente de prise en charge par un livreur.',
+                'lat'    => $requete->sender_lat,
+                'lng'    => $requete->sender_lng,
             ]);
 
-            broadcast(new \App\Events\DeliveryStatusUpdated($delivery))->toOthers();
+            // Notification en temps réel
+            broadcast(new \App\Events\DeliveryStatusUpdated($livraison))->toOthers();
 
-            return $delivery;
+            return $livraison;
         });
 
-        // LOG ÉTAPE 4 : Succès et envoi de la réponse
-        \Log::info("Livraison créée avec ID : " . $delivery->id);
+        // LOG ÉTAPE 4 : Confirmation du succès
+        Log::info("Livraison créée avec succès. ID : " . $livraison->id);
 
         return response()->json([
-            'message'  => "TEST REUSSI : Livraison #{$delivery->id} enregistrée en BDD !",
-            'delivery' => $this->deliveryResource($delivery->load(['order.package'])),
+            'message'  => "Succès : Livraison #{$livraison->id} enregistrée en base de données !",
+            'delivery' => $this->ressourceLivraison($livraison->load(['order.package'])),
         ], 201);
     }
 
-    public function show(Delivery $delivery): JsonResponse
+    /**
+     * GET /api/deliveries/{id} — Détails d'une livraison spécifique
+     */
+    public function show(Delivery $livraison): JsonResponse
     {
-        return response()->json($this->deliveryResource($delivery->load(['order.package', 'statuses', 'driver.user'])));
+        return response()->json($this->ressourceLivraison($livraison->load(['order.package', 'statuses', 'driver.user'])));
     }
 
-    public function tracking($identifier): JsonResponse
+    /**
+     * GET /api/tracking/{identifier} — Suivi d'une livraison via son numéro de commande
+     */
+    public function tracking($identifiant): JsonResponse
     {
-        $delivery = Delivery::whereHas('order', function($q) use ($identifier) {
-            $q->where('order_number', $identifier);
+        $livraison = Delivery::whereHas('order', function($q) use ($identifiant) {
+            $q->where('order_number', $identifiant);
         })->with(['order.package', 'statuses', 'driver.user'])->firstOrFail();
 
-        return response()->json($this->deliveryResource($delivery));
+        return response()->json($this->ressourceLivraison($livraison));
     }
 
-    public function accept(Request $request, Delivery $delivery): JsonResponse
+    /**
+     * POST /api/deliveries/{id}/accept — Acceptation d'une mission par un livreur
+     */
+    public function accept(Request $requete, Delivery $livraison): JsonResponse
     {
-        if ($delivery->driver_id) {
-            return response()->json(['message' => 'Cette mission est déjà assignée.'], 422);
+        if ($livraison->driver_id) {
+            return response()->json(['message' => 'Cette mission est déjà assignée à un autre livreur.'], 422);
         }
 
-        $driver = $request->user()->driver;
-        if (!$driver) return response()->json(['message' => 'Seuls les livreurs peuvent accepter des missions.'], 403);
+        $livreur = $requete->user()->driver;
+        if (!$livreur) {
+            return response()->json(['message' => 'Seuls les livreurs peuvent accepter des missions.'], 403);
+        }
 
-        $delivery->update([
-            'driver_id'   => $driver->id,
+        $livraison->update([
+            'driver_id'   => $livreur->id,
             'status'      => 'assigned',
             'assigned_at' => now(),
         ]);
 
-        $delivery->statuses()->create([
+        $livraison->statuses()->create([
             'status' => 'assigned',
             'label'  => 'Livreur assigné',
-            'note'   => 'La mission a été acceptée par ' . $request->user()->name,
+            'note'   => 'La mission a été acceptée par ' . $requete->user()->name,
         ]);
 
-        broadcast(new \App\Events\DeliveryStatusUpdated($delivery))->toOthers();
+        broadcast(new \App\Events\DeliveryStatusUpdated($livraison))->toOthers();
 
-        return response()->json($this->deliveryResource($delivery));
+        return response()->json($this->ressourceLivraison($livraison));
     }
 
-    public function updateStatus(Request $request, Delivery $delivery): JsonResponse
+    /**
+     * PATCH /api/deliveries/{id}/status — Mise à jour du statut d'une livraison
+     */
+    public function updateStatus(Request $requete, Delivery $livraison): JsonResponse
     {
-        $request->validate([
+        $requete->validate([
             'status'      => 'required|string',
             'proof_photo' => 'nullable|image|max:2048',
-            'signature'   => 'nullable|string', // Base64 signature
+            'signature'   => 'nullable|string', // Signature en Base64
             'latitude'    => 'nullable|numeric',
             'longitude'   => 'nullable|numeric',
             'note'        => 'nullable|string',
         ]);
 
-        $data = ['status' => $request->status];
+        $donnees = ['status' => $requete->status];
 
-        if ($request->status === 'picked_up') {
-            $data['picked_up_at'] = now();
-        } elseif ($request->status === 'delivered') {
-            $data['delivered_at'] = now();
+        if ($requete->status === 'picked_up') {
+            $donnees['picked_up_at'] = now();
+        } elseif ($requete->status === 'delivered') {
+            $donnees['delivered_at'] = now();
         }
 
-        if ($request->hasFile('proof_photo')) {
-            $path = $request->file('proof_photo')->store('proofs', 'public');
-            $data['proof_photo'] = $path;
+        if ($requete->hasFile('proof_photo')) {
+            $chemin = $requete->file('proof_photo')->store('proofs', 'public');
+            $donnees['proof_photo'] = $chemin;
         }
 
-        if ($request->signature) {
-            $data['signature'] = $request->signature;
+        if ($requete->signature) {
+            $donnees['signature'] = $requete->signature;
         }
 
-        $delivery->update($data);
+        $livraison->update($donnees);
 
-        $delivery->statuses()->create([
-            'status' => $request->status,
-            'label'  => Delivery::STATUS_LABELS[$request->status] ?? ucfirst($request->status),
-            'lat'    => $request->latitude,
-            'lng'    => $request->longitude,
-            'note'   => $request->note
+        $livraison->statuses()->create([
+            'status' => $requete->status,
+            'label'  => Delivery::STATUS_LABELS[$requete->status] ?? ucfirst($requete->status),
+            'lat'    => $requete->latitude,
+            'lng'    => $requete->longitude,
+            'note'   => $requete->note
         ]);
 
-        broadcast(new \App\Events\DeliveryStatusUpdated($delivery))->toOthers();
+        broadcast(new \App\Events\DeliveryStatusUpdated($livraison))->toOthers();
 
-        // Webhook notification (simulation)
+        // Notification Webhook (simulation)
         try {
             \Illuminate\Support\Facades\Http::post('https://webhook.site/external-transporter', [
-                'delivery_id' => $delivery->id,
-                'status' => $request->status,
+                'delivery_id' => $livraison->id,
+                'status' => $requete->status,
                 'timestamp' => now()
             ]);
         } catch (\Exception $e) {
-            \Log::warning("Webhook failed: " . $e->getMessage());
+            Log::warning("Échec du Webhook : " . $e->getMessage());
         }
 
-        // Push Notification (Simulation FCM)
+        // Notification Push (Simulation FCM)
         try {
-            $clientToken = $delivery->order->client->fcm_token;
-            if ($clientToken) {
-                \Log::info("Push Notification envoyée à {$delivery->order->client->name} : Statut {$request->status}");
-                // Appel API Firebase ici normalement
+            $jetonClient = $livraison->order->client->fcm_token;
+            if ($jetonClient) {
+                Log::info("Notification Push envoyée à {$livraison->order->client->name} : Nouveau statut {$requete->status}");
             }
         } catch (\Exception $e) {
-            \Log::error("FCM failed: " . $e->getMessage());
+            Log::error("Échec de la notification FCM : " . $e->getMessage());
         }
 
-        return response()->json($this->deliveryResource($delivery));
+        return response()->json($this->ressourceLivraison($livraison));
     }
 
     /**
-     * POST /api/deliveries/{id}/rate — Notation de la livraison
+     * POST /api/deliveries/{id}/rate — Notation d'une livraison terminée
      */
-    public function rate(Request $request, Delivery $delivery): JsonResponse
+    public function rate(Request $requete, Delivery $livraison): JsonResponse
     {
-        $request->validate(['rating' => 'required|integer|min:1|max:5']);
+        $requete->validate(['rating' => 'required|integer|min:1|max:5']);
 
-        if ($delivery->status !== 'delivered') {
+        if ($livraison->status !== 'delivered') {
             return response()->json(['message' => 'Vous ne pouvez noter qu\'une livraison terminée.'], 422);
         }
 
-        if ($delivery->rating) {
+        if ($livraison->rating) {
             return response()->json(['message' => 'Cette livraison a déjà été notée.'], 422);
         }
 
-        $delivery->update(['rating' => $request->rating]);
+        $livraison->update(['rating' => $requete->rating]);
 
         // Mise à jour de la note moyenne du livreur
-        if ($delivery->driver) {
-            $driver = $delivery->driver;
-            $newCount = $driver->rating_count + 1;
-            $newRating = (($driver->rating * $driver->rating_count) + $request->rating) / $newCount;
+        if ($livraison->driver) {
+            $livreur = $livraison->driver;
+            $nouveauCompte = $livreur->rating_count + 1;
+            $nouvelleNote = (($livreur->rating * $livreur->rating_count) + $requete->rating) / $nouveauCompte;
 
-            $driver->update([
-                'rating' => $newRating,
-                'rating_count' => $newCount
+            $livreur->update([
+                'rating' => $nouvelleNote,
+                'rating_count' => $nouveauCompte
             ]);
         }
 
-        return response()->json(['message' => 'Merci pour votre note !', 'new_rating' => $delivery->rating]);
+        return response()->json(['message' => 'Merci pour votre note !', 'new_rating' => $livraison->rating]);
     }
 
     /**
-     * Rapport PDF de livraison
+     * GET /api/deliveries/{id}/receipt — Téléchargement du bon de livraison PDF
      */
-    public function downloadReceipt(Delivery $delivery)
+    public function downloadReceipt(Delivery $livraison)
     {
-        $delivery->load(['order.package', 'driver.user', 'statuses']);
+        $livraison->load(['order.package', 'driver.user', 'statuses']);
 
-        $data = [
-            'delivery' => $delivery,
-            'qrCode' => "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" . urlencode($delivery->order->order_number)
+        $donnees = [
+            'delivery' => $livraison,
+            'qrCode' => "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" . urlencode($livraison->order->order_number)
         ];
 
         $pdf = \App::make('dompdf.wrapper');
 
-        // CSS inline pour un rendu propre sans fichier externe
         $html = '
         <style>
             body { font-family: sans-serif; color: #333; }
@@ -290,7 +304,7 @@ class DeliveryController extends Controller
         </style>
         <div class="header">
             <h1>BON DE LIVRAISON</h1>
-            <p>Commande #' . ($delivery->order->order_number ?? $delivery->id) . '</p>
+            <p>Commande #' . ($livraison->order->order_number ?? $livraison->id) . '</p>
         </div>
 
         <div class="section">
@@ -299,17 +313,17 @@ class DeliveryController extends Controller
                     <td>
                         <div class="section-title">Expéditeur</div>
                         <div class="info-box">
-                            <strong>' . $delivery->order->sender_name . '</strong><br/>
-                            ' . $delivery->order->sender_address . '<br/>
-                            Tél: ' . $delivery->order->sender_phone . '
+                            <strong>' . $livraison->order->sender_name . '</strong><br/>
+                            ' . $livraison->order->sender_address . '<br/>
+                            Tél: ' . $livraison->order->sender_phone . '
                         </div>
                     </td>
                     <td>
                         <div class="section-title">Destinataire</div>
                         <div class="info-box">
-                            <strong>' . $delivery->order->recipient_name . '</strong><br/>
-                            ' . $delivery->order->recipient_address . '<br/>
-                            Tél: ' . $delivery->order->recipient_phone . '
+                            <strong>' . $livraison->order->recipient_name . '</strong><br/>
+                            ' . $livraison->order->recipient_address . '<br/>
+                            Tél: ' . $livraison->order->recipient_phone . '
                         </div>
                     </td>
                 </tr>
@@ -319,44 +333,44 @@ class DeliveryController extends Controller
         <div class="section">
             <div class="section-title">Détails du Colis</div>
             <div class="info-box">
-                Description: ' . ($delivery->order->package->description ?? 'N/A') . '<br/>
-                Poids: ' . ($delivery->order->package->weight_kg ?? '0') . ' kg<br/>
-                Statut Final: <span class="status">' . strtoupper($delivery->status_label) . '</span>
+                Description: ' . ($livraison->order->package->description ?? 'N/A') . '<br/>
+                Poids: ' . ($livraison->order->package->weight_kg ?? '0') . ' kg<br/>
+                Statut Final: <span class="status">' . strtoupper($livraison->status_label) . '</span>
             </div>
         </div>
 
         <div class="section">
-            <div class="section-title">Coordonnées GPS des points</div>
+            <div class="section-title">Coordonnées GPS</div>
             <div class="info-box">
                 <table style="width:100%; font-size: 11px;">
                     <tr>
-                        <td><strong>Départ (Expéditeur) :</strong><br/> Lat: ' . ($delivery->order->sender_lat ?? 'N/A') . ' / Lng: ' . ($delivery->order->sender_lng ?? 'N/A') . '</td>
-                        <td><strong>Arrivée (Destinataire) :</strong><br/> Lat: ' . ($delivery->order->recipient_lat ?? 'N/A') . ' / Lng: ' . ($delivery->order->recipient_lng ?? 'N/A') . '</td>
+                        <td><strong>Départ :</strong><br/> Lat: ' . ($livraison->order->sender_lat ?? 'N/A') . ' / Lng: ' . ($livraison->order->sender_lng ?? 'N/A') . '</td>
+                        <td><strong>Arrivée :</strong><br/> Lat: ' . ($livraison->order->recipient_lat ?? 'N/A') . ' / Lng: ' . ($livraison->order->recipient_lng ?? 'N/A') . '</td>
                     </tr>
                 </table>
             </div>
         </div>';
 
-        if ($delivery->status === 'delivered') {
+        if ($livraison->status === 'delivered') {
             $html .= '
             <div class="section">
                 <table class="grid">
                     <tr>
                         <td>
                             <div class="section-title">Signature du destinataire</div>';
-            if ($delivery->signature) {
-                $html .= '<img src="' . $delivery->signature . '" class="signature-img">';
+            if ($livraison->signature) {
+                $html .= '<img src="' . $livraison->signature . '" class="signature-img">';
             } else {
                 $html .= '<p>Non signée</p>';
             }
 
-            if ($delivery->proof_photo) {
-                $photoPath = storage_path('app/public/' . $delivery->proof_photo);
-                if (file_exists($photoPath)) {
+            if ($livraison->proof_photo) {
+                $cheminPhoto = storage_path('app/public/' . $livraison->proof_photo);
+                if (file_exists($cheminPhoto)) {
                     $html .= '
                     <div style="margin-top:20px;">
                         <div class="section-title">Photo de preuve</div>
-                        <img src="data:image/jpeg;base64,' . base64_encode(file_get_contents($photoPath)) . '" class="proof-img">
+                        <img src="data:image/jpeg;base64,' . base64_encode(file_get_contents($cheminPhoto)) . '" class="proof-img">
                     </div>';
                 }
             }
@@ -365,8 +379,8 @@ class DeliveryController extends Controller
                         </td>
                         <td>
                             <div class="section-title">Informations de livraison</div>
-                            <p>Livré le: ' . ($delivery->delivered_at ? $delivery->delivered_at->format('d/m/Y H:i') : 'N/A') . '</p>
-                            <p>Livreur: ' . ($delivery->driver?->user?->name ?? 'N/A') . '</p>
+                            <p>Livré le : ' . ($livraison->delivered_at ? $livraison->delivered_at->format('d/m/Y H:i') : 'N/A') . '</p>
+                            <p>Livreur : ' . ($livraison->driver?->user?->name ?? 'N/A') . '</p>
                         </td>
                     </tr>
                 </table>
@@ -375,72 +389,75 @@ class DeliveryController extends Controller
 
         $html .= '
         <div class="footer">
-            Document généré automatiquement par GPS Delivery Tracker - ' . now()->format('d/m/Y H:i') . '<br/>
-            <img src="' . $data['qrCode'] . '" width="80" />
+            Document généré automatiquement - ' . now()->format('d/m/Y H:i') . '<br/>
+            <img src="' . $donnees['qrCode'] . '" width="80" />
         </div>';
 
         $pdf->loadHTML($html);
-        return $pdf->download("Bon_Livraison_{$delivery->order->order_number}.pdf");
+        return $pdf->download("Bon_Livraison_{$livraison->order->order_number}.pdf");
     }
 
-    private function deliveryResource($delivery): array
+    /**
+     * Formate la ressource de livraison pour l'API
+     */
+    private function ressourceLivraison($livraison): array
     {
-        $proofPhotoUrl = null;
-        if ($delivery->proof_photo) {
-            $proofPhotoUrl = filter_var($delivery->proof_photo, FILTER_VALIDATE_URL)
-                ? $delivery->proof_photo
-                : url('storage/' . $delivery->proof_photo);
+        $urlPhotoPreuve = null;
+        if ($livraison->proof_photo) {
+            $urlPhotoPreuve = filter_var($livraison->proof_photo, FILTER_VALIDATE_URL)
+                ? $livraison->proof_photo
+                : url('storage/' . $livraison->proof_photo);
         }
 
         return [
-            'id'                => $delivery->id,
-            'status'            => $delivery->status,
-            'proof_photo'       => $proofPhotoUrl,
-            'signature'         => $delivery->signature, // Base64 usually
-            'assigned_at'       => $delivery->assigned_at?->toIso8601String(),
-            'picked_up_at'      => $delivery->picked_up_at?->toIso8601String(),
-            'delivered_at'      => $delivery->delivered_at?->toIso8601String(),
-            'estimated_arrival' => $delivery->estimated_arrival?->format('H:i'),
-            'rating'            => $delivery->rating,
-            'created_at'        => $delivery->created_at?->toIso8601String(),
-            'order' => $delivery->order ? [
-                'id'                => $delivery->order->id,
-                'sender_name'       => $delivery->order->sender_name,
-                'sender_address'    => $delivery->order->sender_address,
-                'sender_lat'        => $delivery->order->sender_lat,
-                'sender_lng'        => $delivery->order->sender_lng,
-                'recipient_name'    => $delivery->order->recipient_name,
-                'recipient_address' => $delivery->order->recipient_address,
-                'recipient_lat'     => $delivery->order->recipient_lat,
-                'recipient_lng'     => $delivery->order->recipient_lng,
-                'package' => $delivery->order->package ? [
-                    'description' => $delivery->order->package->description,
-                    'weight_kg'   => $delivery->order->package->weight_kg,
+            'id'                => $livraison->id,
+            'status'            => $livraison->status,
+            'proof_photo'       => $urlPhotoPreuve,
+            'signature'         => $livraison->signature,
+            'assigned_at'       => $livraison->assigned_at?->toIso8601String(),
+            'picked_up_at'      => $livraison->picked_up_at?->toIso8601String(),
+            'delivered_at'      => $livraison->delivered_at?->toIso8601String(),
+            'estimated_arrival' => $livraison->estimated_arrival?->format('H:i'),
+            'rating'            => $livraison->rating,
+            'created_at'        => $livraison->created_at?->toIso8601String(),
+            'order' => $livraison->order ? [
+                'id'                => $livraison->order->id,
+                'sender_name'       => $livraison->order->sender_name,
+                'sender_address'    => $livraison->order->sender_address,
+                'sender_lat'        => $livraison->order->sender_lat,
+                'sender_lng'        => $livraison->order->sender_lng,
+                'recipient_name'    => $livraison->order->recipient_name,
+                'recipient_address' => $livraison->order->recipient_address,
+                'recipient_lat'     => $livraison->order->recipient_lat,
+                'recipient_lng'     => $livraison->order->recipient_lng,
+                'package' => $livraison->order->package ? [
+                    'description' => $livraison->order->package->description,
+                    'weight_kg'   => $livraison->order->package->weight_kg,
                 ] : null,
             ] : null,
-            'statuses' => $delivery->statuses->map(fn($s) => [
+            'statuses' => $livraison->statuses->map(fn($s) => [
                 'status' => $s->status,
                 'label'  => $s->label,
                 'lat'    => $s->lat,
                 'lng'    => $s->lng,
                 'created_at' => $s->created_at?->toIso8601String() ?? $s->occurred_at?->toIso8601String(),
             ]),
-            'driver' => $delivery->driver ? [
-                'id'   => $delivery->driver->id,
+            'driver' => $livraison->driver ? [
+                'id'   => $livraison->driver->id,
                 'user' => [
-                    'name' => $delivery->driver->user->name ?? 'N/A',
-                    'avatar' => $delivery->driver->user->avatar ? url('storage/' . $delivery->driver->user->avatar) : null,
+                    'name' => $livraison->driver->user->name ?? 'N/A',
+                    'avatar' => $livraison->driver->user->avatar ? url('storage/' . $livraison->driver->user->avatar) : null,
                 ],
-                'status'            => $delivery->driver->status,
-                'rating'            => (float) $delivery->driver->rating,
-                'rating_count'      => $delivery->driver->rating_count,
-                'total_deliveries'  => $delivery->driver->total_deliveries,
-                'vehicle_model'     => $delivery->driver->vehicle_model,
-                'vehicle_type'      => $delivery->driver->vehicle_type,
-                'vehicle_plate'     => $delivery->driver->vehicle_plate,
-                'current_lat'       => $delivery->driver->current_lat,
-                'current_lng'       => $delivery->driver->current_lng,
-                'joined_at'         => $delivery->driver->created_at->toIso8601String(),
+                'status'            => $livraison->driver->status,
+                'rating'            => (float) $livraison->driver->rating,
+                'rating_count'      => $livraison->driver->rating_count,
+                'total_deliveries'  => $livraison->driver->total_deliveries,
+                'vehicle_model'     => $livraison->driver->vehicle_model,
+                'vehicle_type'      => $livraison->driver->vehicle_type,
+                'vehicle_plate'     => $livraison->driver->vehicle_plate,
+                'current_lat'       => $livraison->driver->current_lat,
+                'current_lng'       => $livraison->driver->current_lng,
+                'joined_at'         => $livraison->driver->created_at->toIso8601String(),
             ] : null,
         ];
     }

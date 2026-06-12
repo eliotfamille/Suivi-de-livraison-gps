@@ -43,28 +43,28 @@ import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
-fun ClientDeliveriesScreen(token: String, user: User?, viewModel: DeliveryViewModel, onDeliveryClick: (Delivery) -> Unit) {
-    val deliveries by viewModel.deliveries.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    var selectedTab by remember { mutableStateOf(0) }
-    var showSubmitDialog by remember { mutableStateOf(false) }
+fun EcranLivraisonsClient(jeton: String, utilisateur: User?, modeleDeVue: DeliveryViewModel, lorsClicLivraison: (Delivery) -> Unit) {
+    val livraisons by modeleDeVue.livraisons.collectAsState()
+    val estEnChargement by modeleDeVue.estEnChargement.collectAsState()
+    var ongletSelectionne by remember { mutableStateOf(0) }
+    var afficherDialogueCreation by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        viewModel.fetchDeliveries(token)
+        modeleDeVue.recupererLivraisons(jeton)
     }
     
-    if (showSubmitDialog) {
-        val context = LocalContext.current
-        SubmitDeliveryDialog(
-            token = token,
-            viewModel = viewModel,
-            currentUser = user,
-            onDismiss = { showSubmitDialog = false },
-            onSubmit = { data ->
-                viewModel.submitDelivery(token, data) { result ->
-                    Toast.makeText(context, result, Toast.LENGTH_LONG).show()
+    if (afficherDialogueCreation) {
+        val contexte = LocalContext.current
+        DialogueCreationLivraison(
+            jeton = jeton,
+            modeleDeVue = modeleDeVue,
+            utilisateurActuel = utilisateur,
+            lorsFermeture = { afficherDialogueCreation = false },
+            lorsSoumission = { donnees ->
+                modeleDeVue.soumettreLivraison(jeton, donnees) { resultat ->
+                    Toast.makeText(contexte, resultat, Toast.LENGTH_LONG).show()
                 }
-                showSubmitDialog = false
+                afficherDialogueCreation = false
             }
         )
     }
@@ -80,35 +80,23 @@ fun ClientDeliveriesScreen(token: String, user: User?, viewModel: DeliveryViewMo
                         color = MaterialTheme.colorScheme.primary
                     ) 
                 },
-                navigationIcon = {
-                    IconButton(onClick = {}) {
-                        Icon(Icons.Default.Menu, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { /* Profile */ }) {
-                        Surface(modifier = Modifier.size(32.dp), shape = androidx.compose.foundation.shape.CircleShape, color = MaterialTheme.colorScheme.surfaceVariant) {
-                            Icon(Icons.Default.Person, contentDescription = "Profil", modifier = Modifier.padding(4.dp), tint = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { showSubmitDialog = true },
+                onClick = { afficherDialogueCreation = true },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Nouvelle livraison")
             }
         }
-    ) { padding ->
+    ) { espacement ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .padding(espacement)
                 .background(MaterialTheme.colorScheme.background)
         ) {
             Text(
@@ -119,39 +107,39 @@ fun ClientDeliveriesScreen(token: String, user: User?, viewModel: DeliveryViewMo
                 color = MaterialTheme.colorScheme.onSurface
             )
 
-            // Tabs Styling
+            // Style des onglets
             Surface(
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
             ) {
                 Row(modifier = Modifier.padding(4.dp)) {
-                    TabButton(
-                        text = "En cours", 
-                        isSelected = selectedTab == 0, 
+                    BoutonOnglet(
+                        texte = "En cours", 
+                        estSelectionne = ongletSelectionne == 0, 
                         modifier = Modifier.weight(1f),
-                        onClick = { selectedTab = 0 }
+                        lorsClic = { ongletSelectionne = 0 }
                     )
-                    TabButton(
-                        text = "Historique", 
-                        isSelected = selectedTab == 1, 
+                    BoutonOnglet(
+                        texte = "Historique", 
+                        estSelectionne = ongletSelectionne == 1, 
                         modifier = Modifier.weight(1f),
-                        onClick = { selectedTab = 1 }
+                        lorsClic = { ongletSelectionne = 1 }
                     )
                 }
             }
 
-            if (isLoading && deliveries.isEmpty()) {
+            if (estEnChargement && livraisons.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             } else {
                 PullToRefreshBox(
-                    isRefreshing = isLoading,
-                    onRefresh = { viewModel.fetchDeliveries(token) },
+                    isRefreshing = estEnChargement,
+                    onRefresh = { modeleDeVue.recupererLivraisons(jeton) },
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    if (deliveries.isEmpty()) {
+                    if (livraisons.isEmpty()) {
                         Box(
                             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
                             contentAlignment = Alignment.Center
@@ -164,15 +152,15 @@ fun ClientDeliveriesScreen(token: String, user: User?, viewModel: DeliveryViewMo
                             contentPadding = PaddingValues(16.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            val filteredDeliveries = if (selectedTab == 0) {
-                                deliveries.filter { it.status != "delivered" && it.status != "failed" }
+                            val livraisonsFiltrees = if (ongletSelectionne == 0) {
+                                livraisons.filter { it.status != "delivered" && it.status != "failed" }
                             } else {
-                                deliveries.filter { it.status == "delivered" || it.status == "failed" }
+                                livraisons.filter { it.status == "delivered" || it.status == "failed" }
                             }
 
-                            items(filteredDeliveries) { delivery ->
-                                DeliveryCard(delivery) {
-                                    onDeliveryClick(delivery)
+                            items(livraisonsFiltrees) { livraison ->
+                                CarteLivraison(livraison) {
+                                    lorsClicLivraison(livraison)
                                 }
                             }
                         }
@@ -184,36 +172,36 @@ fun ClientDeliveriesScreen(token: String, user: User?, viewModel: DeliveryViewMo
 }
 
 @Composable
-fun UserSearchField(
-    label: String,
-    value: String,
-    onValueChange: (String) -> Unit,
-    onUserSelected: (User) -> Unit,
-    viewModel: DeliveryViewModel,
-    token: String
+fun ChampRechercheUtilisateur(
+    libelle: String,
+    valeur: String,
+    lorsChangementValeur: (String) -> Unit,
+    lorsUtilisateurSelectionne: (User) -> Unit,
+    modeleDeVue: DeliveryViewModel,
+    jeton: String
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    val users by viewModel.users.collectAsState()
+    var estEtendu by remember { mutableStateOf(false) }
+    val utilisateurs by modeleDeVue.utilisateurs.collectAsState()
 
     Column(modifier = Modifier.fillMaxWidth()) {
         OutlinedTextField(
-            value = value,
+            value = valeur,
             onValueChange = {
-                val sanitized = it.replace("\n", "").replace("\r", "")
-                onValueChange(sanitized)
-                if (sanitized.length >= 2) {
-                    viewModel.searchUsers(token, sanitized)
-                    expanded = true
+                val nettoye = it.replace("\n", "").replace("\r", "")
+                lorsChangementValeur(nettoye)
+                if (nettoye.length >= 2) {
+                    modeleDeVue.rechercherUtilisateurs(jeton, nettoye)
+                    estEtendu = true
                 } else {
-                    expanded = false
+                    estEtendu = false
                 }
             },
-            label = { Text(label) },
+            label = { Text(libelle) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             trailingIcon = { Icon(Icons.Default.Search, null) }
         )
-        if (expanded && users.isNotEmpty()) {
+        if (estEtendu && utilisateurs.isNotEmpty()) {
             Surface(
                 modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp),
                 shape = RoundedCornerShape(8.dp),
@@ -222,13 +210,13 @@ fun UserSearchField(
                 border = androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray)
             ) {
                 LazyColumn {
-                    items(users) { user ->
+                    items(utilisateurs) { utilisateur ->
                         ListItem(
-                            headlineContent = { Text(user.name) },
-                            supportingContent = { Text(user.email) },
+                            headlineContent = { Text(utilisateur.name) },
+                            supportingContent = { Text(utilisateur.email) },
                             modifier = Modifier.clickable {
-                                onUserSelected(user)
-                                expanded = false
+                                lorsUtilisateurSelectionne(utilisateur)
+                                estEtendu = false
                             }
                         )
                     }
@@ -240,39 +228,39 @@ fun UserSearchField(
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
-fun SubmitDeliveryDialog(
-    token: String,
-    viewModel: DeliveryViewModel,
-    currentUser: User?,
-    onDismiss: () -> Unit,
-    onSubmit: (Map<String, Any?>) -> Unit
+fun DialogueCreationLivraison(
+    jeton: String,
+    modeleDeVue: DeliveryViewModel,
+    utilisateurActuel: User?,
+    lorsFermeture: () -> Unit,
+    lorsSoumission: (Map<String, Any?>) -> Unit
 ) {
     var description by remember { mutableStateOf("") }
-    var weight by remember { mutableStateOf("") }
-    var recipientName by remember { mutableStateOf("") }
-    var recipientPhone by remember { mutableStateOf("") }
-    var recipientAddress by remember { mutableStateOf("") }
-    var senderName by remember { mutableStateOf(currentUser?.name ?: "") }
-    var senderPhone by remember { mutableStateOf(currentUser?.phone ?: "") }
-    var senderAddress by remember { mutableStateOf(currentUser?.domicile ?: "") }
+    var poids by remember { mutableStateOf("") }
+    var nomDestinataire by remember { mutableStateOf("") }
+    var telephoneDestinataire by remember { mutableStateOf("") }
+    var adresseDestinataire by remember { mutableStateOf("") }
+    var nomExpediteur by remember { mutableStateOf(utilisateurActuel?.name ?: "") }
+    var telephoneExpediteur by remember { mutableStateOf(utilisateurActuel?.phone ?: "") }
+    var adresseExpediteur by remember { mutableStateOf(utilisateurActuel?.domicile ?: "") }
     
-    var senderGeoPoint by remember { mutableStateOf<GeoPoint?>(
-        if (currentUser?.domicile_lat != null) GeoPoint(currentUser.domicile_lat, currentUser.domicile_lng!!) else null
+    var pointGeoExpediteur by remember { mutableStateOf<GeoPoint?>(
+        if (utilisateurActuel?.domicile_lat != null) GeoPoint(utilisateurActuel.domicile_lat, utilisateurActuel.domicile_lng!!) else null
     ) }
-    var recipientGeoPoint by remember { mutableStateOf<GeoPoint?>(null) }
+    var pointGeoDestinataire by remember { mutableStateOf<GeoPoint?>(null) }
     
-    var showMapFor by remember { mutableStateOf<String?>(null) } // "sender" or "recipient"
+    var afficherCartePour by remember { mutableStateOf<String?>(null) } // "expediteur" ou "destinataire"
 
-    val context = LocalContext.current
-    val locationPermissionState = rememberPermissionState(Manifest.permission.ACCESS_FINE_LOCATION)
+    val contexte = LocalContext.current
+    val etatPermissionLocalisation = rememberPermissionState(Manifest.permission.ACCESS_FINE_LOCATION)
 
-    if (showMapFor != null) {
-        val title = if (showMapFor == "sender") "Position de départ" else "Position de destination"
-        val initialPos = if (showMapFor == "sender") senderGeoPoint else recipientGeoPoint
+    if (afficherCartePour != null) {
+        val titre = if (afficherCartePour == "expediteur") "Position de départ" else "Position de destination"
+        val positionInitiale = if (afficherCartePour == "expediteur") pointGeoExpediteur else pointGeoDestinataire
         
         AlertDialog(
-            onDismissRequest = { showMapFor = null },
-            title = { Text(title) },
+            onDismissRequest = { afficherCartePour = null },
+            title = { Text(titre) },
             text = {
                 Box(modifier = Modifier.fillMaxWidth().height(300.dp)) {
                     AndroidView(
@@ -284,72 +272,72 @@ fun SubmitDeliveryDialog(
                                 setTileSource(TileSourceFactory.MAPNIK)
                                 setMultiTouchControls(true)
                                 controller.setZoom(12.0)
-                                controller.setCenter(initialPos ?: GeoPoint(-18.8792, 47.5079))
+                                controller.setCenter(positionInitiale ?: GeoPoint(-18.8792, 47.5079))
                                 
-                                val locationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(ctx), this)
-                                locationOverlay.enableMyLocation()
-                                overlays.add(locationOverlay)
+                                val coucheLocalisation = MyLocationNewOverlay(GpsMyLocationProvider(ctx), this)
+                                coucheLocalisation.enableMyLocation()
+                                overlays.add(coucheLocalisation)
 
-                                val overlay = MapEventsOverlay(object : MapEventsReceiver {
+                                val overlayEvenements = MapEventsOverlay(object : MapEventsReceiver {
                                     override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
-                                        if (showMapFor == "sender") {
-                                            senderGeoPoint = p
-                                            senderAddress = "Position choisie"
+                                        if (afficherCartePour == "expediteur") {
+                                            pointGeoExpediteur = p
+                                            adresseExpediteur = "Position choisie"
                                         } else {
-                                            recipientGeoPoint = p
-                                            recipientAddress = "Position choisie"
+                                            pointGeoDestinataire = p
+                                            adresseDestinataire = "Position choisie"
                                         }
                                         invalidate()
                                         return true
                                     }
                                     override fun longPressHelper(p: GeoPoint): Boolean = false
                                 })
-                                overlays.add(overlay)
+                                overlays.add(overlayEvenements)
                             }
                         },
-                        update = { mapView ->
-                            mapView.overlays.removeAll { it is Marker }
-                            val markerPos = if (showMapFor == "sender") senderGeoPoint else recipientGeoPoint
-                            markerPos?.let {
-                                val marker = Marker(mapView)
-                                marker.position = it
-                                marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                                mapView.overlays.add(marker)
+                        update = { vueCarte ->
+                            vueCarte.overlays.removeAll { it is Marker }
+                            val positionMarqueur = if (afficherCartePour == "expediteur") pointGeoExpediteur else pointGeoDestinataire
+                            positionMarqueur?.let {
+                                val marqueur = Marker(vueCarte)
+                                marqueur.position = it
+                                marqueur.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                                vueCarte.overlays.add(marqueur)
                             }
-                            mapView.invalidate()
+                            vueCarte.invalidate()
                         }
                     )
                 }
             },
             confirmButton = {
-                Button(onClick = { showMapFor = null }) { Text("Valider") }
+                Button(onClick = { afficherCartePour = null }) { Text("Valider") }
             }
         )
     }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = lorsFermeture,
         title = { Text("Nouvelle livraison", fontWeight = FontWeight.Bold) },
         text = {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 item {
                     Text("Expéditeur", fontWeight = FontWeight.Bold)
-                    UserSearchField(
-                        label = "Nom ou Email",
-                        value = senderName,
-                        onValueChange = { senderName = it },
-                        onUserSelected = { u ->
-                            senderName = u.name
-                            senderPhone = u.phone ?: ""
-                            senderAddress = u.domicile ?: ""
-                            if (u.domicile_lat != null) senderGeoPoint = GeoPoint(u.domicile_lat, u.domicile_lng!!)
+                    ChampRechercheUtilisateur(
+                        libelle = "Nom ou Email",
+                        valeur = nomExpediteur,
+                        lorsChangementValeur = { nomExpediteur = it },
+                        lorsUtilisateurSelectionne = { u ->
+                            nomExpediteur = u.name
+                            telephoneExpediteur = u.phone ?: ""
+                            adresseExpediteur = u.domicile ?: ""
+                            if (u.domicile_lat != null) pointGeoExpediteur = GeoPoint(u.domicile_lat, u.domicile_lng!!)
                         },
-                        viewModel = viewModel,
-                        token = token
+                        modeleDeVue = modeleDeVue,
+                        jeton = jeton
                     )
                     OutlinedTextField(
-                        value = senderPhone, 
-                        onValueChange = { senderPhone = it.replace("\n", "").replace("\r", "") }, 
+                        value = telephoneExpediteur, 
+                        onValueChange = { telephoneExpediteur = it.replace("\n", "").replace("\r", "") }, 
                         label = { Text("Téléphone") }, 
                         modifier = Modifier.fillMaxWidth(), 
                         singleLine = true,
@@ -360,10 +348,10 @@ fun SubmitDeliveryDialog(
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilledTonalButton(
                             onClick = {
-                                if (locationPermissionState.status.isGranted) {
-                                    Toast.makeText(context, "Récupération...", Toast.LENGTH_SHORT).show()
-                                    showMapFor = "sender"
-                                } else locationPermissionState.launchPermissionRequest()
+                                if (etatPermissionLocalisation.status.isGranted) {
+                                    Toast.makeText(contexte, "Récupération...", Toast.LENGTH_SHORT).show()
+                                    afficherCartePour = "expediteur"
+                                } else etatPermissionLocalisation.launchPermissionRequest()
                             },
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(0.dp)
@@ -374,11 +362,11 @@ fun SubmitDeliveryDialog(
                         }
                         FilledTonalButton(
                             onClick = {
-                                currentUser?.domicile_lat?.let { lat ->
-                                    senderGeoPoint = GeoPoint(lat, currentUser.domicile_lng!!)
-                                    senderAddress = currentUser.domicile ?: "Domicile"
-                                    Toast.makeText(context, "Domicile sélectionné", Toast.LENGTH_SHORT).show()
-                                } ?: Toast.makeText(context, "Aucun domicile enregistré", Toast.LENGTH_SHORT).show()
+                                utilisateurActuel?.domicile_lat?.let { lat ->
+                                    pointGeoExpediteur = GeoPoint(lat, utilisateurActuel.domicile_lng!!)
+                                    adresseExpediteur = utilisateurActuel.domicile ?: "Domicile"
+                                    Toast.makeText(contexte, "Domicile sélectionné", Toast.LENGTH_SHORT).show()
+                                } ?: Toast.makeText(contexte, "Aucun domicile enregistré", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.weight(1.2f),
                             contentPadding = PaddingValues(0.dp)
@@ -388,7 +376,7 @@ fun SubmitDeliveryDialog(
                             Text("Domicile", fontSize = 12.sp)
                         }
                         FilledTonalButton(
-                            onClick = { showMapFor = "sender" },
+                            onClick = { afficherCartePour = "expediteur" },
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(0.dp)
                         ) {
@@ -397,30 +385,30 @@ fun SubmitDeliveryDialog(
                             Text("Carte", fontSize = 12.sp)
                         }
                     }
-                    if (senderGeoPoint != null) {
-                        Text("Coordonnées : ${String.format("%.4f", senderGeoPoint!!.latitude)}, ${String.format("%.4f", senderGeoPoint!!.longitude)}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                    if (pointGeoExpediteur != null) {
+                        Text("Coordonnées : ${String.format("%.4f", pointGeoExpediteur!!.latitude)}, ${String.format("%.4f", pointGeoExpediteur!!.longitude)}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                     }
                 }
                 
                 item {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("Destinataire", fontWeight = FontWeight.Bold)
-                    UserSearchField(
-                        label = "Nom ou Email",
-                        value = recipientName,
-                        onValueChange = { recipientName = it },
-                        onUserSelected = { u ->
-                            recipientName = u.name
-                            recipientPhone = u.phone ?: ""
-                            recipientAddress = u.domicile ?: ""
-                            if (u.domicile_lat != null) recipientGeoPoint = GeoPoint(u.domicile_lat, u.domicile_lng!!)
+                    ChampRechercheUtilisateur(
+                        libelle = "Nom ou Email",
+                        valeur = nomDestinataire,
+                        lorsChangementValeur = { nomDestinataire = it },
+                        lorsUtilisateurSelectionne = { u ->
+                            nomDestinataire = u.name
+                            telephoneDestinataire = u.phone ?: ""
+                            adresseDestinataire = u.domicile ?: ""
+                            if (u.domicile_lat != null) pointGeoDestinataire = GeoPoint(u.domicile_lat, u.domicile_lng!!)
                         },
-                        viewModel = viewModel,
-                        token = token
+                        modeleDeVue = modeleDeVue,
+                        jeton = jeton
                     )
                     OutlinedTextField(
-                        value = recipientPhone, 
-                        onValueChange = { recipientPhone = it.replace("\n", "").replace("\r", "") }, 
+                        value = telephoneDestinataire, 
+                        onValueChange = { telephoneDestinataire = it.replace("\n", "").replace("\r", "") }, 
                         label = { Text("Téléphone") }, 
                         modifier = Modifier.fillMaxWidth(), 
                         singleLine = true,
@@ -430,7 +418,7 @@ fun SubmitDeliveryDialog(
                     Text("Position de destination :", style = MaterialTheme.typography.labelMedium)
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilledTonalButton(
-                            onClick = { showMapFor = "recipient" },
+                            onClick = { afficherCartePour = "destinataire" },
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(Icons.Default.Map, null)
@@ -451,8 +439,8 @@ fun SubmitDeliveryDialog(
                         singleLine = true
                     )
                     OutlinedTextField(
-                        value = weight,
-                        onValueChange = { weight = it.replace("\n", "").replace("\r", "") },
+                        value = poids,
+                        onValueChange = { poids = it.replace("\n", "").replace("\r", "") },
                         label = { Text("Poids (kg)") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
@@ -464,64 +452,44 @@ fun SubmitDeliveryDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val data = mapOf(
+                    val donnees = mapOf(
                         "description" to description,
-                        "weight_kg" to (weight.toDoubleOrNull() ?: 0.0),
-                        "recipient_name" to recipientName,
-                        "recipient_phone" to recipientPhone,
-                        "recipient_address" to recipientAddress,
-                        "recipient_lat" to (recipientGeoPoint?.latitude ?: 0.0),
-                        "recipient_lng" to (recipientGeoPoint?.longitude ?: 0.0),
-                        "sender_name" to senderName,
-                        "sender_phone" to senderPhone,
-                        "sender_address" to senderAddress,
-                        "sender_lat" to (senderGeoPoint?.latitude ?: 0.0),
-                        "sender_lng" to (senderGeoPoint?.longitude ?: 0.0)
+                        "weight_kg" to (poids.toDoubleOrNull() ?: 0.0),
+                        "recipient_name" to nomDestinataire,
+                        "recipient_phone" to telephoneDestinataire,
+                        "recipient_address" to adresseDestinataire,
+                        "recipient_lat" to (pointGeoDestinataire?.latitude ?: 0.0),
+                        "recipient_lng" to (pointGeoDestinataire?.longitude ?: 0.0),
+                        "sender_name" to nomExpediteur,
+                        "sender_phone" to telephoneExpediteur,
+                        "sender_address" to adresseExpediteur,
+                        "sender_lat" to (pointGeoExpediteur?.latitude ?: 0.0),
+                        "sender_lng" to (pointGeoExpediteur?.longitude ?: 0.0)
                     )
-                    onSubmit(data)
+                    lorsSoumission(donnees)
                 },
-                enabled = senderGeoPoint != null && recipientGeoPoint != null && description.isNotBlank()
+                enabled = pointGeoExpediteur != null && pointGeoDestinataire != null && description.isNotBlank()
             ) {
                 Text("Soumettre")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Annuler") }
+            TextButton(onClick = lorsFermeture) { Text("Annuler") }
         }
     )
 }
 
 @Composable
-fun TabButton(text: String, isSelected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        color = if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent,
-        shape = RoundedCornerShape(8.dp),
-        shadowElevation = if (isSelected) 2.dp else 0.dp,
-        modifier = modifier
-    ) {
-        Box(modifier = Modifier.padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-fun DeliveryCard(delivery: Delivery, onClick: () -> Unit) {
+fun CarteLivraison(livraison: Delivery, lorsClic: () -> Unit) {
     Card(
-        onClick = onClick,
+        onClick = lorsClic,
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         shape = RoundedCornerShape(12.dp)
     ) {
         Box(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-            val (accentColor, statusLabel, statusIcon) = when (delivery.status) {
+            val (couleurAccent, libelleStatut, iconeStatut) = when (livraison.status) {
                 "in_transit", "picked_up", "assigned" -> Triple(MaterialTheme.colorScheme.primary, "En route", Icons.Default.LocalShipping)
                 "pending" -> Triple(Color(0xFFD97706), "En attente", Icons.Default.HourglassEmpty)
                 "delivered" -> Triple(Color(0xFF059669), "Livré", Icons.Default.CheckCircle)
@@ -533,7 +501,7 @@ fun DeliveryCard(delivery: Delivery, onClick: () -> Unit) {
                     .align(Alignment.CenterStart)
                     .fillMaxHeight()
                     .width(4.dp)
-                    .background(accentColor)
+                    .background(couleurAccent)
             )
 
             Column(modifier = Modifier.padding(20.dp).padding(start = 8.dp)) {
@@ -546,7 +514,7 @@ fun DeliveryCard(delivery: Delivery, onClick: () -> Unit) {
                             letterSpacing = 0.5.sp
                         )
                         Text(
-                            "FR-${8000+delivery.id}-X", 
+                            "FR-${8000+livraison.id}-X", 
                             style = MaterialTheme.typography.titleLarge, 
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -554,20 +522,20 @@ fun DeliveryCard(delivery: Delivery, onClick: () -> Unit) {
                     }
                     
                     Surface(
-                        color = accentColor.copy(alpha = 0.1f),
+                        color = couleurAccent.copy(alpha = 0.1f),
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(statusIcon, contentDescription = null, modifier = Modifier.size(16.dp), tint = accentColor)
+                            Icon(iconeStatut, contentDescription = null, modifier = Modifier.size(16.dp), tint = couleurAccent)
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                statusLabel, 
+                                libelleStatut, 
                                 style = MaterialTheme.typography.labelLarge, 
                                 fontWeight = FontWeight.Bold, 
-                                color = accentColor
+                                color = couleurAccent
                             )
                         }
                     }
@@ -579,7 +547,7 @@ fun DeliveryCard(delivery: Delivery, onClick: () -> Unit) {
                     Icon(Icons.Default.LocationOn, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        delivery.order?.recipient_address ?: "Adresse non renseignée", 
+                        livraison.order?.recipient_address ?: "Adresse non renseignée", 
                         style = MaterialTheme.typography.bodyLarge, 
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -597,13 +565,13 @@ fun DeliveryCard(delivery: Delivery, onClick: () -> Unit) {
                     )
                 }
 
-                if (delivery.driver != null) {
+                if (livraison.driver != null) {
                     Spacer(modifier = Modifier.height(10.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            "Livreur : ${delivery.driver?.user?.name ?: "Assigné"}",
+                            "Livreur : ${livraison.driver?.user?.name ?: "Assigné"}",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

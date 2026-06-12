@@ -24,27 +24,27 @@ import androidx.compose.ui.unit.sp
 import com.nenykely.front_kotlin.viewmodel.AuthViewModel
 
 @Composable
-fun RegisterScreen(viewModel: AuthViewModel, onRegisterSuccess: () -> Unit, onBackToLogin: () -> Unit) {
-    var name by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
-    var selectedRole by remember { mutableStateOf("client") }
+fun EcranInscription(modeleDeVue: AuthViewModel, lorsSuccesInscription: () -> Unit, lorsRetourConnexion: () -> Unit) {
+    var nom by remember { mutableStateOf("") }
+    var courriel by remember { mutableStateOf("") }
+    var telephone by remember { mutableStateOf("") }
+    var motDePasse by remember { mutableStateOf("") }
+    var motDePasseVisible by remember { mutableStateOf(false) }
+    var roleSelectionne by remember { mutableStateOf("client") }
     
-    // Vehicle info for drivers
-    var vehicleType by remember { mutableStateOf("") }
-    var vehicleModel by remember { mutableStateOf("") }
-    var vehiclePlate by remember { mutableStateOf("") }
+    // Infos véhicule pour les livreurs
+    var typeVehicule by remember { mutableStateOf("") }
+    var modeleVehicule by remember { mutableStateOf("") }
+    var plaqueVehicule by remember { mutableStateOf("") }
     
-    val context = LocalContext.current
-    val user by viewModel.user.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    val error by viewModel.error.collectAsState()
+    val contexte = LocalContext.current
+    val utilisateur by modeleDeVue.utilisateur.collectAsState()
+    val estEnChargement by modeleDeVue.estEnChargement.collectAsState()
+    val erreur by modeleDeVue.erreur.collectAsState()
 
-    LaunchedEffect(user) {
-        user?.let {
-            Toast.makeText(context, "Inscription réussie : ${it.name} (${it.role ?: it.roles?.firstOrNull() ?: "Utilisateur"})", Toast.LENGTH_LONG).show()
+    LaunchedEffect(utilisateur) {
+        utilisateur?.let {
+            Toast.makeText(contexte, "Inscription réussie : ${it.name} (${it.role ?: it.roles?.firstOrNull() ?: "Utilisateur"})", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -78,11 +78,11 @@ fun RegisterScreen(viewModel: AuthViewModel, onRegisterSuccess: () -> Unit, onBa
                 border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
             ) {
                 Column(modifier = Modifier.padding(24.dp)) {
-                    // Name
+                    // Nom
                     Text("Nom complet", style = MaterialTheme.typography.labelLarge)
                     OutlinedTextField(
-                        value = name,
-                        onValueChange = { name = it.replace("\n", "").replace("\r", "") },
+                        value = nom,
+                        onValueChange = { nom = it.replace("\n", "").replace("\r", "") },
                         placeholder = { Text("Jean Dupont") },
                         leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
                         modifier = Modifier.fillMaxWidth(),
@@ -95,8 +95,8 @@ fun RegisterScreen(viewModel: AuthViewModel, onRegisterSuccess: () -> Unit, onBa
                     // Email
                     Text("Adresse Email", style = MaterialTheme.typography.labelLarge)
                     OutlinedTextField(
-                        value = email,
-                        onValueChange = { email = it.replace("\n", "").replace("\r", "") },
+                        value = courriel,
+                        onValueChange = { courriel = it.replace("\n", "").replace("\r", "") },
                         placeholder = { Text("nom@exemple.com") },
                         leadingIcon = { Icon(Icons.Default.Mail, contentDescription = null) },
                         modifier = Modifier.fillMaxWidth(),
@@ -107,11 +107,11 @@ fun RegisterScreen(viewModel: AuthViewModel, onRegisterSuccess: () -> Unit, onBa
                     
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Phone
+                    // Téléphone
                     Text("Téléphone (Optionnel)", style = MaterialTheme.typography.labelLarge)
                     OutlinedTextField(
-                        value = phone,
-                        onValueChange = { phone = it.replace("\n", "").replace("\r", "") },
+                        value = telephone,
+                        onValueChange = { telephone = it.replace("\n", "").replace("\r", "") },
                         placeholder = { Text("+261 34 00 000 00") },
                         leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
                         modifier = Modifier.fillMaxWidth(),
@@ -122,60 +122,60 @@ fun RegisterScreen(viewModel: AuthViewModel, onRegisterSuccess: () -> Unit, onBa
 
                     Spacer(modifier = Modifier.height(16.dp))
                     
-                    // Password
+                    // Mot de passe
                     Text("Mot de passe", style = MaterialTheme.typography.labelLarge)
                     OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it.replace("\n", "").replace("\r", "") },
+                        value = motDePasse,
+                        onValueChange = { motDePasse = it.replace("\n", "").replace("\r", "") },
                         placeholder = { Text("••••••••") },
                         leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                         trailingIcon = {
-                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            IconButton(onClick = { motDePasseVisible = !motDePasseVisible }) {
                                 Icon(
-                                    if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    if (motDePasseVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                                     contentDescription = null
                                 )
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(8.dp),
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        visualTransformation = if (motDePasseVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         singleLine = true
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Role Selection
+                    // Sélection du rôle
                     Text("Vous êtes un :", style = MaterialTheme.typography.labelLarge)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         RadioButton(
-                            selected = selectedRole == "client",
-                            onClick = { selectedRole = "client" }
+                            selected = roleSelectionne == "client",
+                            onClick = { roleSelectionne = "client" }
                         )
                         Text("Client", modifier = Modifier.padding(start = 4.dp))
                         
                         Spacer(modifier = Modifier.width(16.dp))
                         
                         RadioButton(
-                            selected = selectedRole == "driver",
-                            onClick = { selectedRole = "driver" }
+                            selected = roleSelectionne == "driver",
+                            onClick = { roleSelectionne = "driver" }
                         )
                         Text("Livreur", modifier = Modifier.padding(start = 4.dp))
                     }
 
-                    if (selectedRole == "driver") {
+                    if (roleSelectionne == "driver") {
                         Spacer(modifier = Modifier.height(24.dp))
                         Text("Informations du véhicule", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(16.dp))
 
                         Text("Type de véhicule", style = MaterialTheme.typography.labelLarge)
                         OutlinedTextField(
-                            value = vehicleType,
-                            onValueChange = { vehicleType = it },
+                            value = typeVehicule,
+                            onValueChange = { typeVehicule = it },
                             placeholder = { Text("Moto, Voiture, Camion...") },
                             leadingIcon = { Icon(Icons.Default.Category, contentDescription = null) },
                             modifier = Modifier.fillMaxWidth(),
@@ -187,8 +187,8 @@ fun RegisterScreen(viewModel: AuthViewModel, onRegisterSuccess: () -> Unit, onBa
 
                         Text("Modèle du véhicule", style = MaterialTheme.typography.labelLarge)
                         OutlinedTextField(
-                            value = vehicleModel,
-                            onValueChange = { vehicleModel = it },
+                            value = modeleVehicule,
+                            onValueChange = { modeleVehicule = it },
                             placeholder = { Text("Peugeot Partner, Honda CB...") },
                             leadingIcon = { Icon(Icons.Default.LocalShipping, contentDescription = null) },
                             modifier = Modifier.fillMaxWidth(),
@@ -200,8 +200,8 @@ fun RegisterScreen(viewModel: AuthViewModel, onRegisterSuccess: () -> Unit, onBa
 
                         Text("Numéro d'immatriculation", style = MaterialTheme.typography.labelLarge)
                         OutlinedTextField(
-                            value = vehiclePlate,
-                            onValueChange = { vehiclePlate = it },
+                            value = plaqueVehicule,
+                            onValueChange = { plaqueVehicule = it },
                             placeholder = { Text("1234 TAB") },
                             leadingIcon = { Icon(Icons.Default.Badge, contentDescription = null) },
                             modifier = Modifier.fillMaxWidth(),
@@ -210,29 +210,29 @@ fun RegisterScreen(viewModel: AuthViewModel, onRegisterSuccess: () -> Unit, onBa
                         )
                     }
                     
-                    if (error != null) {
+                    if (erreur != null) {
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(text = error!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        Text(text = erreur!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                     }
                     
                     Spacer(modifier = Modifier.height(24.dp))
                     
                     Button(
                         onClick = { 
-                            viewModel.register(
-                                name, email, password, phone, selectedRole,
-                                if (selectedRole == "driver") vehicleType else null,
-                                if (selectedRole == "driver") vehicleModel else null,
-                                if (selectedRole == "driver") vehiclePlate else null,
-                                onSuccess = onRegisterSuccess
+                            modeleDeVue.sinscrire(
+                                nom, courriel, motDePasse, telephone, roleSelectionne,
+                                if (roleSelectionne == "driver") typeVehicule else null,
+                                if (roleSelectionne == "driver") modeleVehicule else null,
+                                if (roleSelectionne == "driver") plaqueVehicule else null,
+                                lorsSucces = lorsSuccesInscription
                             ) 
                         },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                        enabled = !isLoading
+                        enabled = !estEnChargement
                     ) {
-                        if (isLoading) {
+                        if (estEnChargement) {
                             CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
                         } else {
                             Text("S'inscrire", style = MaterialTheme.typography.titleMedium)
@@ -242,7 +242,7 @@ fun RegisterScreen(viewModel: AuthViewModel, onRegisterSuccess: () -> Unit, onBa
                     Spacer(modifier = Modifier.height(16.dp))
                     
                     TextButton(
-                        onClick = onBackToLogin,
+                        onClick = lorsRetourConnexion,
                         modifier = Modifier.align(Alignment.CenterHorizontally)
                     ) {
                         Text("Déjà un compte ? Se connecter", color = MaterialTheme.colorScheme.primary)

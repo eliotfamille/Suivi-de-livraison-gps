@@ -1,13 +1,11 @@
 package com.nenykely.front_kotlin.ui.screens.client
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
@@ -19,29 +17,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nenykely.front_kotlin.viewmodel.DeliveryViewModel
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(token: String, viewModel: DeliveryViewModel, onNavigateToDeliveries: () -> Unit, onNavigateToDelivery: (Int, String) -> Unit) {
-    val deliveries by viewModel.deliveries.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    var searchQuery by remember { mutableStateOf("") }
-    val scope = rememberCoroutineScope()
-    val primaryBlue = MaterialTheme.colorScheme.primary
+fun EcranAccueil(jeton: String, modeleDeVue: DeliveryViewModel, lorsNavigationVersLivraisons: () -> Unit, lorsNavigationVersLivraison: (Int, String) -> Unit) {
+    val livraisons by modeleDeVue.livraisons.collectAsState()
+    val estEnChargement by modeleDeVue.estEnChargement.collectAsState()
+    var requeteRecherche by remember { mutableStateOf("") }
+    val bleuPrimaire = MaterialTheme.colorScheme.primary
 
     LaunchedEffect(Unit) {
-        viewModel.fetchDeliveries(token)
+        modeleDeVue.recupererLivraisons(jeton)
     }
 
-    val activeDelivery = deliveries.firstOrNull { it.status != "delivered" && it.status != "failed" }
+    val livraisonActive = livraisons.firstOrNull { it.status != "delivered" && it.status != "failed" }
 
     Scaffold(
         topBar = {
@@ -51,7 +44,7 @@ fun HomeScreen(token: String, viewModel: DeliveryViewModel, onNavigateToDeliveri
                         "Logistics Pro", 
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Black, 
-                        color = primaryBlue
+                        color = bleuPrimaire
                     ) 
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -59,11 +52,11 @@ fun HomeScreen(token: String, viewModel: DeliveryViewModel, onNavigateToDeliveri
                 )
             )
         }
-    ) { padding ->
+    ) { espacement ->
         PullToRefreshBox(
-            isRefreshing = isLoading,
-            onRefresh = { viewModel.fetchDeliveries(token) },
-            modifier = Modifier.fillMaxSize().padding(padding)
+            isRefreshing = estEnChargement,
+            onRefresh = { modeleDeVue.recupererLivraisons(jeton) },
+            modifier = Modifier.fillMaxSize().padding(espacement)
         ) {
             LazyColumn(
                 modifier = Modifier
@@ -74,7 +67,7 @@ fun HomeScreen(token: String, viewModel: DeliveryViewModel, onNavigateToDeliveri
             ) {
                 item {
                     Spacer(modifier = Modifier.height(16.dp))
-                    // Search Section
+                    // Section Recherche
                     Text(
                         text = "Suivre un colis",
                         style = MaterialTheme.typography.titleLarge,
@@ -83,8 +76,8 @@ fun HomeScreen(token: String, viewModel: DeliveryViewModel, onNavigateToDeliveri
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it.replace("\n", "").replace("\r", "") },
+                        value = requeteRecherche,
+                        onValueChange = { requeteRecherche = it.replace("\n", "").replace("\r", "") },
                         placeholder = { Text("Entrez le numéro de suivi...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                         singleLine = true,
@@ -92,22 +85,22 @@ fun HomeScreen(token: String, viewModel: DeliveryViewModel, onNavigateToDeliveri
                             IconButton(
                                 onClick = { 
                                     // Extraction de l'ID du format FR-XXXX-X ou direct
-                                    val id = if (searchQuery.contains("-")) {
-                                        searchQuery.split("-").getOrNull(1)?.toIntOrNull()?.minus(8000)
+                                    val id = if (requeteRecherche.contains("-")) {
+                                        requeteRecherche.split("-").getOrNull(1)?.toIntOrNull()?.minus(8000)
                                     } else {
-                                        searchQuery.replace(Regex("[^0-9]"), "").toIntOrNull()
+                                        requeteRecherche.replace(Regex("[^0-9]"), "").toIntOrNull()
                                     }
                                     
                                     if (id != null) {
                                         // On cherche le statut dans la liste locale pour décider de l'écran
-                                        val existing = deliveries.find { it.id == id }
-                                        onNavigateToDelivery(id, existing?.status ?: "pending")
+                                        val existant = livraisons.find { it.id == id }
+                                        lorsNavigationVersLivraison(id, existant?.status ?: "pending")
                                     }
                                 },
                                 modifier = Modifier
                                     .padding(end = 4.dp)
                                     .size(40.dp)
-                                    .background(primaryBlue, RoundedCornerShape(8.dp))
+                                    .background(bleuPrimaire, RoundedCornerShape(8.dp))
                             ) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp))
                             }
@@ -126,7 +119,7 @@ fun HomeScreen(token: String, viewModel: DeliveryViewModel, onNavigateToDeliveri
                 }
 
                 item {
-                    // Active Delivery Summary
+                    // Résumé de la livraison active
                     Text(
                         text = "En cours de livraison",
                         style = MaterialTheme.typography.titleMedium,
@@ -135,13 +128,13 @@ fun HomeScreen(token: String, viewModel: DeliveryViewModel, onNavigateToDeliveri
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     
-                    if (activeDelivery != null) {
+                    if (livraisonActive != null) {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                             shape = RoundedCornerShape(20.dp),
-                            onClick = { onNavigateToDelivery(activeDelivery.id, activeDelivery.status) }
+                            onClick = { lorsNavigationVersLivraison(livraisonActive.id, livraisonActive.status) }
                         ) {
                             Column(modifier = Modifier.padding(20.dp)) {
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -155,7 +148,15 @@ fun HomeScreen(token: String, viewModel: DeliveryViewModel, onNavigateToDeliveri
                                         ) {
                                             Icon(Icons.Default.LocalShipping, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
                                             Spacer(modifier = Modifier.width(6.dp))
-                                            Text(activeDelivery.status, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                                            val libelleStatut = when(livraisonActive.status) {
+                                                "pending" -> "EN ATTENTE"
+                                                "assigned" -> "ASSIGNÉ"
+                                                "picked_up" -> "RÉCUPÉRÉ"
+                                                "in_transit" -> "EN TRANSIT"
+                                                "delivered" -> "LIVRÉ"
+                                                else -> livraisonActive.status.uppercase()
+                                            }
+                                            Text(libelleStatut, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
                                         }
                                     }
                                     
@@ -170,12 +171,12 @@ fun HomeScreen(token: String, viewModel: DeliveryViewModel, onNavigateToDeliveri
                                     }
                                 }
                                 
-                                Text(text = "Colis #FR-${activeDelivery.id}X", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                Text(text = "Colis #FR-${livraisonActive.id}X", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                 
                                 Spacer(modifier = Modifier.height(20.dp))
                                 
                                 Text("LIVRAISON ESTIMÉE", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 0.5.sp)
-                                Text(activeDelivery.estimated_arrival ?: "Prochainement", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = primaryBlue)
+                                Text(livraisonActive.estimated_arrival ?: "Prochainement", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = bleuPrimaire)
                             }
                         }
                     } else {
@@ -207,7 +208,7 @@ fun HomeScreen(token: String, viewModel: DeliveryViewModel, onNavigateToDeliveri
                                     .height(180.dp)
                                     .background(MaterialTheme.colorScheme.surfaceVariant)
                             ) {
-                                Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.fillMaxSize().alpha(0.1f), tint = primaryBlue)
+                                Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.fillMaxSize().alpha(0.1f), tint = bleuPrimaire)
                                 
                                 Box(modifier = Modifier.align(Alignment.Center)) {
                                     Box(modifier = Modifier.align(Alignment.TopCenter).offset(y = (-20).dp)) {
@@ -216,7 +217,7 @@ fun HomeScreen(token: String, viewModel: DeliveryViewModel, onNavigateToDeliveri
                                     Surface(
                                         modifier = Modifier.size(36.dp),
                                         shape = CircleShape,
-                                        color = primaryBlue,
+                                        color = bleuPrimaire,
                                         shadowElevation = 4.dp,
                                         border = BorderStroke(2.dp, MaterialTheme.colorScheme.surface)
                                     ) {
@@ -228,7 +229,7 @@ fun HomeScreen(token: String, viewModel: DeliveryViewModel, onNavigateToDeliveri
                             Column(modifier = Modifier.padding(20.dp)) {
                                 Text("VOS LIVRAISONS", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 0.5.sp)
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.List, contentDescription = null, tint = primaryBlue, modifier = Modifier.size(18.dp))
+                                    Icon(Icons.Default.List, contentDescription = null, tint = bleuPrimaire, modifier = Modifier.size(18.dp))
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text("Historique et suivi complet", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                 }
@@ -236,7 +237,7 @@ fun HomeScreen(token: String, viewModel: DeliveryViewModel, onNavigateToDeliveri
                                 Spacer(modifier = Modifier.height(20.dp))
                                 
                                 OutlinedButton(
-                                    onClick = onNavigateToDeliveries,
+                                    onClick = lorsNavigationVersLivraisons,
                                     modifier = Modifier.fillMaxWidth().height(48.dp),
                                     shape = RoundedCornerShape(12.dp),
                                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -250,6 +251,26 @@ fun HomeScreen(token: String, viewModel: DeliveryViewModel, onNavigateToDeliveri
                     Spacer(modifier = Modifier.height(32.dp))
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun BoutonOnglet(texte: String, estSelectionne: Boolean, modifier: Modifier = Modifier, lorsClic: () -> Unit) {
+    Surface(
+        onClick = lorsClic,
+        color = if (estSelectionne) MaterialTheme.colorScheme.surface else Color.Transparent,
+        shape = RoundedCornerShape(8.dp),
+        shadowElevation = if (estSelectionne) 2.dp else 0.dp,
+        modifier = modifier
+    ) {
+        Box(modifier = Modifier.padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
+            Text(
+                text = texte,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = if (estSelectionne) FontWeight.Bold else FontWeight.Medium,
+                color = if (estSelectionne) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

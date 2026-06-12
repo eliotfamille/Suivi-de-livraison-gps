@@ -30,30 +30,30 @@ import java.io.ByteArrayOutputStream
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SignatureScreen(viewModel: DeliveryViewModel, onSignatureCaptured: (String?) -> Unit, onBack: () -> Unit) {
-    val paths = remember { mutableStateListOf<androidx.compose.ui.graphics.Path>() }
-    var currentPath by remember { mutableStateOf<androidx.compose.ui.graphics.Path?>(null) }
-    val density = LocalDensity.current
-    val isLoading by viewModel.isLoading.collectAsState()
-    val context = LocalContext.current
+fun EcranSignature(modeleDeVue: DeliveryViewModel, lorsSignatureCapturee: (String?) -> Unit, lorsRetour: () -> Unit) {
+    val traces = remember { mutableStateListOf<androidx.compose.ui.graphics.Path>() }
+    var traceActuelle by remember { mutableStateOf<androidx.compose.ui.graphics.Path?>(null) }
+    val densite = LocalDensity.current
+    val estEnChargement by modeleDeVue.estEnChargement.collectAsState()
+    val contexte = LocalContext.current
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text("Signature Électronique", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
                 navigationIcon = {
-                    IconButton(onClick = onBack, enabled = !isLoading) {
+                    IconButton(onClick = lorsRetour, enabled = !estEnChargement) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         }
-    ) { padding ->
+    ) { espacement ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .padding(espacement)
                 .background(MaterialTheme.colorScheme.background)
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -71,8 +71,8 @@ fun SignatureScreen(viewModel: DeliveryViewModel, onSignatureCaptured: (String?)
                     .weight(1f)
                     .padding(vertical = 16.dp)
             ) {
-                val boxWidth = constraints.maxWidth
-                val boxHeight = constraints.maxHeight
+                val largeurBoite = constraints.maxWidth
+                val hauteurBoite = constraints.maxHeight
 
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -84,36 +84,36 @@ fun SignatureScreen(viewModel: DeliveryViewModel, onSignatureCaptured: (String?)
                         modifier = Modifier
                             .fillMaxSize()
                             .pointerInput(Unit) {
-                                if (isLoading) return@pointerInput
+                                if (estEnChargement) return@pointerInput
                                 detectDragGestures(
-                                    onDragStart = { offset ->
-                                        currentPath = androidx.compose.ui.graphics.Path().apply {
-                                            moveTo(offset.x, offset.y)
+                                    onDragStart = { position ->
+                                        traceActuelle = androidx.compose.ui.graphics.Path().apply {
+                                            moveTo(position.x, position.y)
                                         }
                                     },
-                                    onDrag = { change, _ ->
-                                        currentPath?.lineTo(change.position.x, change.position.y)
-                                        val p = currentPath
-                                        currentPath = null
-                                        currentPath = p
+                                    onDrag = { changement, _ ->
+                                        traceActuelle?.lineTo(changement.position.x, changement.position.y)
+                                        val t = traceActuelle
+                                        traceActuelle = null
+                                        traceActuelle = t
                                     },
                                     onDragEnd = {
-                                        currentPath?.let { paths.add(it) }
-                                        currentPath = null
+                                        traceActuelle?.let { traces.add(it) }
+                                        traceActuelle = null
                                     }
                                 )
                             }
                     ) {
-                        paths.forEach { path ->
+                        traces.forEach { trace ->
                             drawPath(
-                                path = path,
+                                path = trace,
                                 color = Color.Black,
                                 style = Stroke(width = 10f, cap = StrokeCap.Round, join = StrokeJoin.Round)
                             )
                         }
-                        currentPath?.let { path ->
+                        traceActuelle?.let { trace ->
                             drawPath(
-                                path = path,
+                                path = trace,
                                 color = Color.Black,
                                 style = Stroke(width = 10f, cap = StrokeCap.Round, join = StrokeJoin.Round)
                             )
@@ -126,8 +126,8 @@ fun SignatureScreen(viewModel: DeliveryViewModel, onSignatureCaptured: (String?)
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     OutlinedButton(
-                        onClick = { paths.clear() },
-                        enabled = !isLoading,
+                        onClick = { traces.clear() },
+                        enabled = !estEnChargement,
                         modifier = Modifier.weight(1f).height(56.dp)
                     ) {
                         Text("Effacer")
@@ -135,13 +135,13 @@ fun SignatureScreen(viewModel: DeliveryViewModel, onSignatureCaptured: (String?)
 
                     Button(
                         onClick = {
-                            if (paths.isNotEmpty()) {
-                                // Capture at actual size for maximum fidelity
-                                val bitmap = Bitmap.createBitmap(boxWidth, boxHeight, Bitmap.Config.ARGB_8888)
-                                val canvas = android.graphics.Canvas(bitmap)
-                                canvas.drawColor(android.graphics.Color.WHITE)
+                            if (traces.isNotEmpty()) {
+                                // Capture à la taille réelle pour une fidélité maximale
+                                val imageBitmap = Bitmap.createBitmap(largeurBoite, hauteurBoite, Bitmap.Config.ARGB_8888)
+                                val canevas = android.graphics.Canvas(imageBitmap)
+                                canevas.drawColor(android.graphics.Color.WHITE)
                                 
-                                val paint = android.graphics.Paint().apply {
+                                val peinture = android.graphics.Paint().apply {
                                     color = android.graphics.Color.BLACK
                                     style = android.graphics.Paint.Style.STROKE
                                     strokeWidth = 12f
@@ -150,23 +150,23 @@ fun SignatureScreen(viewModel: DeliveryViewModel, onSignatureCaptured: (String?)
                                     isAntiAlias = true
                                 }
                                 
-                                paths.forEach { path ->
-                                    canvas.drawPath(path.asAndroidPath(), paint)
+                                traces.forEach { trace ->
+                                    canevas.drawPath(trace.asAndroidPath(), peinture)
                                 }
                                 
-                                val outputStream = ByteArrayOutputStream()
-                                bitmap.compress(Bitmap.CompressFormat.JPEG, 85, outputStream)
-                                val base64 = "data:image/jpeg;base64," + Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
+                                val fluxSortie = ByteArrayOutputStream()
+                                imageBitmap.compress(Bitmap.CompressFormat.JPEG, 85, fluxSortie)
+                                val signatureBase64 = "data:image/jpeg;base64," + Base64.encodeToString(fluxSortie.toByteArray(), Base64.NO_WRAP)
                                 
-                                onSignatureCaptured(base64)
-                                onBack()
+                                lorsSignatureCapturee(signatureBase64)
+                                lorsRetour()
                             }
                         },
-                        enabled = !isLoading && paths.isNotEmpty(),
+                        enabled = !estEnChargement && traces.isNotEmpty(),
                         modifier = Modifier.weight(1f).height(56.dp),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        if (isLoading) {
+                        if (estEnChargement) {
                             CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
                         } else {
                             Text("Confirmer")

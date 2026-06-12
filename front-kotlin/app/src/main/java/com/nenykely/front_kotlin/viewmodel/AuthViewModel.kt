@@ -1,7 +1,6 @@
 package com.nenykely.front_kotlin.viewmodel
 
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nenykely.front_kotlin.data.DeliveryRepository
 import com.nenykely.front_kotlin.data.models.RegisterRequest
@@ -11,194 +10,212 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
-import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 
 class AuthViewModel(application: android.app.Application) : AndroidViewModel(application) {
-    private val repository: DeliveryRepository = DeliveryRepository(application)
+    private val depot: DeliveryRepository = DeliveryRepository(application)
 
-    private val _user = MutableStateFlow<User?>(null)
-    val user = _user.asStateFlow()
+    private val _utilisateur = MutableStateFlow<User?>(null)
+    val utilisateur = _utilisateur.asStateFlow()
 
-    private val _token = MutableStateFlow<String?>(null)
-    val token = _token.asStateFlow()
+    private val _jeton = MutableStateFlow<String?>(null)
+    val jeton = _jeton.asStateFlow()
 
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading = _isLoading.asStateFlow()
+    private val _estEnChargement = MutableStateFlow(false)
+    val estEnChargement = _estEnChargement.asStateFlow()
 
-    private val _error = MutableStateFlow<String?>(null)
-    val error = _error.asStateFlow()
+    private val _erreur = MutableStateFlow<String?>(null)
+    val erreur = _erreur.asStateFlow()
 
-    private val _isDarkMode = MutableStateFlow(false)
-    val isDarkMode = _isDarkMode.asStateFlow()
+    private val _estModeSombre = MutableStateFlow(false)
+    val estModeSombre = _estModeSombre.asStateFlow()
 
-    fun toggleDarkMode() {
-        _isDarkMode.value = !_isDarkMode.value
+    fun basculerModeSombre() {
+        _estModeSombre.value = !_estModeSombre.value
     }
 
-    fun login(email: String, password: String, onSuccess: () -> Unit) {
+    fun seConnecter(courriel: String, motDePasse: String, lorsSucces: () -> Unit) {
         viewModelScope.launch {
-            _isLoading.value = true
-            _error.value = null
+            _estEnChargement.value = true
+            _erreur.value = null
             try {
-                val response = repository.login(email, password)
-                if (response.isSuccessful) {
-                    val authResponse = response.body()
-                    _user.value = authResponse?.user
-                    _token.value = authResponse?.token
-                    android.util.Log.d("AuthViewModel", "User logged in: ${authResponse?.user?.name}, roles: ${authResponse?.user?.roles}")
-                    onSuccess()
+                val reponse = depot.login(courriel, motDePasse)
+                if (reponse.isSuccessful) {
+                    val reponseAuth = reponse.body()
+                    _utilisateur.value = reponseAuth?.user
+                    _jeton.value = reponseAuth?.token
+                    android.util.Log.d("AuthViewModel", "Utilisateur connecté : ${reponseAuth?.user?.name}")
+                    lorsSucces()
                 } else {
-                    when (response.code()) {
-                        401 -> _error.value = "Mot de passe incorrect"
-                        404 -> _error.value = "Compte inexistant"
-                        else -> _error.value = "Email ou mot de passe incorrect"
+                    when (reponse.code()) {
+                        401 -> _erreur.value = "Mot de passe incorrect"
+                        404 -> _erreur.value = "Compte inexistant"
+                        else -> _erreur.value = "Email ou mot de passe incorrect"
                     }
                 }
             } catch (e: Exception) {
-                _error.value = "Erreur de connexion au serveur"
+                _erreur.value = "Erreur de connexion au serveur"
             } finally {
-                _isLoading.value = false
+                _estEnChargement.value = false
             }
         }
     }
 
-    fun logout() {
-        _user.value = null
-        _token.value = null
-        _error.value = null
-    }
-
-    fun fetchProfile() {
-        val currentToken = _token.value ?: return
+    fun reinitialiserMotDePasse(courriel: String, nouveauMdp: String, lorsSucces: () -> Unit) {
         viewModelScope.launch {
-            _isLoading.value = true
+            _estEnChargement.value = true
+            _erreur.value = null
             try {
-                val response = repository.me(currentToken)
-                if (response.isSuccessful) {
-                    _user.value = response.body()
+                val reponse = depot.resetPassword(courriel, nouveauMdp)
+                if (reponse.isSuccessful) {
+                    lorsSucces()
+                } else {
+                    _erreur.value = "Email non trouvé ou erreur lors de la mise à jour"
                 }
             } catch (e: Exception) {
-                _error.value = "Erreur de chargement du profil"
+                _erreur.value = "Erreur de connexion"
             } finally {
-                _isLoading.value = false
+                _estEnChargement.value = false
             }
         }
     }
 
-    fun updateProfile(
-        name: String? = null,
-        phone: String? = null,
+    fun seDeconnecter() {
+        _utilisateur.value = null
+        _jeton.value = null
+        _erreur.value = null
+    }
+
+    fun recupererProfil() {
+        val jetonActuel = _jeton.value ?: return
+        viewModelScope.launch {
+            _estEnChargement.value = true
+            try {
+                val reponse = depot.me(jetonActuel)
+                if (reponse.isSuccessful) {
+                    _utilisateur.value = reponse.body()
+                }
+            } catch (e: Exception) {
+                _erreur.value = "Erreur de chargement du profil"
+            } finally {
+                _estEnChargement.value = false
+            }
+        }
+    }
+
+    fun mettreAJourProfil(
+        nom: String? = null,
+        telephone: String? = null,
         domicile: String? = null,
         domicile_lat: Double? = null,
         domicile_lng: Double? = null,
         bureau: String? = null,
         bureau_lat: Double? = null,
         bureau_lng: Double? = null,
-        vehicle_type: String? = null,
-        vehicle_model: String? = null,
-        vehicle_plate: String? = null,
-        imageFile: File? = null
+        type_vehicule: String? = null,
+        modele_vehicule: String? = null,
+        plaque_vehicule: String? = null,
+        fichierImage: File? = null
     ) {
-        val currentToken = _token.value ?: return
+        val jetonActuel = _jeton.value ?: return
         viewModelScope.launch {
-            _isLoading.value = true
+            _estEnChargement.value = true
             try {
-                val response = if (imageFile != null) {
-                    val namePart = name?.toRequestBody("text/plain".toMediaTypeOrNull())
-                    val phonePart = phone?.toRequestBody("text/plain".toMediaTypeOrNull())
-                    val domicilePart = domicile?.toRequestBody("text/plain".toMediaTypeOrNull())
-                    val latPart = domicile_lat?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
-                    val lngPart = domicile_lng?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
-                    val vtPart = vehicle_type?.toRequestBody("text/plain".toMediaTypeOrNull())
-                    val vmPart = vehicle_model?.toRequestBody("text/plain".toMediaTypeOrNull())
-                    val vpPart = vehicle_plate?.toRequestBody("text/plain".toMediaTypeOrNull())
+                val reponse = if (fichierImage != null) {
+                    val partieNom = nom?.toRequestBody("text/plain".toMediaTypeOrNull())
+                    val partieTel = telephone?.toRequestBody("text/plain".toMediaTypeOrNull())
+                    val partieDomicile = domicile?.toRequestBody("text/plain".toMediaTypeOrNull())
+                    val partieLat = domicile_lat?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
+                    val partieLng = domicile_lng?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
+                    val partieTypeV = type_vehicule?.toRequestBody("text/plain".toMediaTypeOrNull())
+                    val partieModelV = modele_vehicule?.toRequestBody("text/plain".toMediaTypeOrNull())
+                    val partiePlaqueV = plaque_vehicule?.toRequestBody("text/plain".toMediaTypeOrNull())
                     
-                    val imagePart = MultipartBody.Part.createFormData(
+                    val partieImage = MultipartBody.Part.createFormData(
                         "avatar",
-                        imageFile.name,
-                        imageFile.asRequestBody("image/*".toMediaTypeOrNull())
+                        fichierImage.name,
+                        fichierImage.asRequestBody("image/*".toMediaTypeOrNull())
                     )
                     
-                    repository.updateProfileMultipart(
-                        currentToken, namePart, phonePart, domicilePart, latPart, lngPart, 
-                        vtPart, vmPart, vpPart, imagePart
+                    depot.updateProfileMultipart(
+                        jetonActuel, partieNom, partieTel, partieDomicile, partieLat, partieLng, 
+                        partieTypeV, partieModelV, partiePlaqueV, partieImage
                     )
                 } else {
-                    val body = mutableMapOf<String, String?>()
-                    name?.let { body["name"] = it }
-                    phone?.let { body["phone"] = it }
-                    domicile?.let { body["domicile"] = it }
-                    domicile_lat?.let { body["domicile_lat"] = it.toString() }
-                    domicile_lng?.let { body["domicile_lng"] = it.toString() }
-                    bureau?.let { body["bureau"] = it }
-                    bureau_lat?.let { body["bureau_lat"] = it.toString() }
-                    bureau_lng?.let { body["bureau_lng"] = it.toString() }
-                    vehicle_type?.let { body["vehicle_type"] = it }
-                    vehicle_model?.let { body["vehicle_model"] = it }
-                    vehicle_plate?.let { body["vehicle_plate"] = it }
-                    repository.updateProfile(currentToken, body)
+                    val corps = mutableMapOf<String, String?>()
+                    nom?.let { corps["name"] = it }
+                    telephone?.let { corps["phone"] = it }
+                    domicile?.let { corps["domicile"] = it }
+                    domicile_lat?.let { corps["domicile_lat"] = it.toString() }
+                    domicile_lng?.let { corps["domicile_lng"] = it.toString() }
+                    bureau?.let { corps["bureau"] = it }
+                    bureau_lat?.let { corps["bureau_lat"] = it.toString() }
+                    bureau_lng?.let { corps["bureau_lng"] = it.toString() }
+                    type_vehicule?.let { corps["vehicle_type"] = it }
+                    modele_vehicule?.let { corps["vehicle_model"] = it }
+                    plaque_vehicule?.let { corps["vehicle_plate"] = it }
+                    depot.updateProfile(jetonActuel, corps)
                 }
 
-                if (response.isSuccessful) {
-                    _user.value = response.body()
+                if (reponse.isSuccessful) {
+                    _utilisateur.value = reponse.body()
                 } else {
-                    _error.value = "Update failed: ${response.code()}"
+                    _erreur.value = "Échec de la mise à jour : ${reponse.code()}"
                 }
             } catch (e: Exception) {
-                _error.value = e.message
+                _erreur.value = e.message
             } finally {
-                _isLoading.value = false
+                _estEnChargement.value = false
             }
         }
     }
 
-    fun register(
-        name: String, 
-        email: String, 
-        password: String, 
-        phone: String?, 
+    fun sinscrire(
+        nom: String, 
+        courriel: String, 
+        motDePasse: String, 
+        telephone: String?, 
         role: String = "client",
-        vehicleType: String? = null,
-        vehicleModel: String? = null,
-        vehiclePlate: String? = null,
-        onSuccess: () -> Unit
+        typeVehicule: String? = null,
+        modeleVehicule: String? = null,
+        plaqueVehicule: String? = null,
+        lorsSucces: () -> Unit
     ) {
         viewModelScope.launch {
-            _isLoading.value = true
-            _error.value = null
+            _estEnChargement.value = true
+            _erreur.value = null
             try {
-                val response = repository.register(
+                val reponse = depot.register(
                     RegisterRequest(
-                        name = name,
-                        email = email,
-                        password = password,
-                        password_confirmation = password,
-                        phone = if (phone.isNullOrBlank()) null else phone,
+                        name = nom,
+                        email = courriel,
+                        password = motDePasse,
+                        password_confirmation = motDePasse,
+                        phone = if (telephone.isNullOrBlank()) null else telephone,
                         role = role,
-                        vehicle_type = vehicleType,
-                        vehicle_model = vehicleModel,
-                        vehicle_plate = vehiclePlate
+                        vehicle_type = typeVehicule,
+                        vehicle_model = modeleVehicule,
+                        vehicle_plate = plaqueVehicule
                     )
                 )
-                if (response.isSuccessful) {
-                    val authResponse = response.body()
-                    _user.value = authResponse?.user
-                    _token.value = authResponse?.token
-                    android.util.Log.d("AuthViewModel", "User logged in: ${authResponse?.user?.name}, roles: ${authResponse?.user?.roles}")
-                    onSuccess()
+                if (reponse.isSuccessful) {
+                    val reponseAuth = reponse.body()
+                    _utilisateur.value = reponseAuth?.user
+                    _jeton.value = reponseAuth?.token
+                    android.util.Log.d("AuthViewModel", "Compte créé : ${reponseAuth?.user?.name}")
+                    lorsSucces()
                 } else {
-                    when (response.code()) {
-                        422 -> _error.value = "Email déjà utilisé"
-                        else -> _error.value = "Données invalides ou erreur serveur"
+                    when (reponse.code()) {
+                        422 -> _erreur.value = "Email déjà utilisé"
+                        else -> _erreur.value = "Données invalides ou erreur serveur"
                     }
                 }
             } catch (e: Exception) {
-                _error.value = "Erreur de connexion au serveur"
+                _erreur.value = "Erreur de connexion au serveur"
             } finally {
-                _isLoading.value = false
+                _estEnChargement.value = false
             }
         }
     }

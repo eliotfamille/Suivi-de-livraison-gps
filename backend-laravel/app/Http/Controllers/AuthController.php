@@ -84,6 +84,52 @@ class AuthController extends Controller
         ]);
     }
 
+    public function forgotPassword(Request $request): JsonResponse
+    {
+        $request->validate(['email' => 'required|email']);
+
+        $user = User::where('email', $request->email)->first();
+        if (!$user) {
+            return response()->json(['message' => 'Utilisateur non trouvé'], 404);
+        }
+
+        // Générer un code à 6 chiffres
+        $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+        // Enregistrer dans password_reset_tokens
+        \DB::table('password_reset_tokens')->updateOrInsert(
+            ['email' => $user->email],
+            [
+                'token' => Hash::make($code),
+                'created_at' => now()
+            ]
+        );
+
+        // Envoyer le code par email (en mode log, ça ira dans storage/logs/laravel.log)
+        try {
+            \Illuminate\Support\Facades\Mail::raw("Votre code de réinitialisation est : $code", function ($message) use ($user) {
+                $message->to($user->email)->subject("Réinitialisation de mot de passe");
+            });
+        } catch (\Exception $e) {
+            // Optionnel: logger l'erreur si le mail n'est pas configuré
+        }
+
+        return response()->json(['message' => 'Code de réinitialisation envoyé']);
+    }
+
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $request->validate([
+            'email' => 'required|email|exists:users,email',
+            'password' => 'required|min:8',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+        $user->update(['password' => Hash::make($request->password)]);
+
+        return response()->json(['message' => 'Mot de passe mis à jour avec succès']);
+    }
+
     public function logout(Request $request): JsonResponse
     {
         $request->user()->currentAccessToken()->delete();

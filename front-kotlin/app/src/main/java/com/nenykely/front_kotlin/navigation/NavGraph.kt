@@ -15,6 +15,7 @@ import com.nenykely.front_kotlin.viewmodel.DeliveryViewModel
 sealed class Screen(val route: String) {
     object Login : Screen("login")
     object Register : Screen("register")
+    object ForgotPassword : Screen("forgot_password")
     object Home : Screen("home")
     object Deliveries : Screen("deliveries")
     object Tracking : Screen("tracking/{deliveryId}") {
@@ -42,18 +43,17 @@ fun NavGraph(
     authViewModel: AuthViewModel,
     deliveryViewModel: DeliveryViewModel
 ) {
-    val token by authViewModel.token.collectAsState()
+    val jeton by authViewModel.jeton.collectAsState()
 
     NavHost(
         navController = navController,
         startDestination = Screen.Login.route
     ) {
         composable(Screen.Login.route) {
-            val userState by authViewModel.user.collectAsState()
-            LoginScreen(
-                viewModel = authViewModel,
-                onLoginSuccess = {
-                    val user = authViewModel.user.value
+            EcranConnexion(
+                modeleDeVue = authViewModel,
+                lorsSuccesConnexion = {
+                    val user = authViewModel.utilisateur.value
                     if (user?.isDriver() == true) {
                         navController.navigate(Screen.Deliveries.route) {
                             popUpTo(Screen.Login.route) { inclusive = true }
@@ -64,17 +64,25 @@ fun NavGraph(
                         }
                     }
                 },
-                onNavigateToRegister = {
+                lorsNavigationVersInscription = {
                     navController.navigate(Screen.Register.route)
+                },
+                lorsMotDePasseOublie = {
+                    navController.navigate(Screen.ForgotPassword.route)
                 }
             )
         }
+        composable(Screen.ForgotPassword.route) {
+            EcranMotDePasseOublie(
+                modeleDeVue = authViewModel,
+                lorsRetour = { navController.popBackStack() }
+            )
+        }
         composable(Screen.Register.route) {
-            val userState by authViewModel.user.collectAsState()
-            RegisterScreen(
-                viewModel = authViewModel,
-                onRegisterSuccess = {
-                    val user = authViewModel.user.value
+            EcranInscription(
+                modeleDeVue = authViewModel,
+                lorsSuccesInscription = {
+                    val user = authViewModel.utilisateur.value
                     if (user?.isDriver() == true) {
                         navController.navigate(Screen.Deliveries.route) {
                             popUpTo(Screen.Login.route) { inclusive = true }
@@ -85,20 +93,20 @@ fun NavGraph(
                         }
                     }
                 },
-                onBackToLogin = {
+                lorsRetourConnexion = {
                     navController.popBackStack()
                 }
             )
         }
         composable(Screen.Home.route) {
-            token?.let { t ->
-                HomeScreen(
-                    token = t,
-                    viewModel = deliveryViewModel,
-                    onNavigateToDeliveries = {
+            jeton?.let { t ->
+                EcranAccueil(
+                    jeton = t,
+                    modeleDeVue = deliveryViewModel,
+                    lorsNavigationVersLivraisons = {
                         navController.navigate(Screen.Deliveries.route)
                     },
-                    onNavigateToDelivery = { id, status ->
+                    lorsNavigationVersLivraison = { id, status ->
                         if (status == "delivered" || status == "failed") {
                             navController.navigate(Screen.DeliveryDetails.createRoute(id))
                         } else {
@@ -109,14 +117,14 @@ fun NavGraph(
             }
         }
         composable(Screen.Deliveries.route) {
-            val user by authViewModel.user.collectAsState()
-            token?.let { t ->
+            val user by authViewModel.utilisateur.collectAsState()
+            jeton?.let { t ->
                 if (user?.isDriver() == true) {
-                    DriverDeliveriesScreen(t, deliveryViewModel, onDeliveryClick = { id ->
+                    EcranLivraisonsLivreur(t, deliveryViewModel, lorsClicLivraison = { id ->
                         navController.navigate(Screen.DriverMission.createRoute(id))
                     })
                 } else {
-                    ClientDeliveriesScreen(t, user, deliveryViewModel, onDeliveryClick = { delivery ->
+                    EcranLivraisonsClient(t, user, deliveryViewModel, lorsClicLivraison = { delivery ->
                         if (delivery.status == "delivered" || delivery.status == "failed") {
                             navController.navigate(Screen.DeliveryDetails.createRoute(delivery.id))
                         } else {
@@ -128,11 +136,11 @@ fun NavGraph(
         }
         composable(Screen.Tracking.route) { backStackEntry ->
             val deliveryId = backStackEntry.arguments?.getString("deliveryId")?.toIntOrNull()
-            token?.let { t ->
+            jeton?.let { t ->
                 deliveryId?.let { id ->
-                    TrackingScreen(t, id, deliveryViewModel, authViewModel, onBack = {
+                    EcranSuivi(t, id, deliveryViewModel, authViewModel, lorsRetour = {
                         navController.popBackStack()
-                    }, onNavigateToDriver = { driverId ->
+                    }, lorsNavigationVersLivreur = { driverId ->
                         navController.navigate(Screen.DriverProfile.createRoute(driverId))
                     })
                 }
@@ -140,11 +148,11 @@ fun NavGraph(
         }
         composable(Screen.DeliveryDetails.route) { backStackEntry ->
             val deliveryId = backStackEntry.arguments?.getString("deliveryId")?.toIntOrNull()
-            token?.let { t ->
+            jeton?.let { t ->
                 deliveryId?.let { id ->
-                    DeliveryDetailsScreen(t, id, deliveryViewModel, onBack = {
+                    EcranDetailsLivraison(t, id, deliveryViewModel, lorsRetour = {
                         navController.popBackStack()
-                    }, onNavigateToDriver = { driverId ->
+                    }, lorsNavigationVersLivreur = { driverId ->
                         navController.navigate(Screen.DriverProfile.createRoute(driverId))
                     })
                 }
@@ -152,11 +160,11 @@ fun NavGraph(
         }
         composable(Screen.DriverMission.route) { backStackEntry ->
             val deliveryId = backStackEntry.arguments?.getString("deliveryId")?.toIntOrNull()
-            token?.let { t ->
+            jeton?.let { t ->
                 deliveryId?.let { id ->
-                    DriverMissionScreen(t, id, deliveryViewModel, authViewModel, onBack = {
+                    EcranMissionLivreur(t, id, deliveryViewModel, authViewModel, lorsRetour = {
                         navController.popBackStack()
-                    }, onSignature = {
+                    }, lorsSignature = {
                         navController.navigate(Screen.Signature.createRoute(id))
                     })
                 }
@@ -164,45 +172,45 @@ fun NavGraph(
         }
         composable(Screen.Signature.route) { backStackEntry ->
             val deliveryId = backStackEntry.arguments?.getString("deliveryId")?.toIntOrNull()
-            token?.let { t ->
+            jeton?.let { t ->
                 deliveryId?.let { id ->
-                    SignatureScreen(
-                        viewModel = deliveryViewModel,
-                        onSignatureCaptured = { signatureBase64 ->
-                            val photo = deliveryViewModel.proofPhoto.value
-                            deliveryViewModel.updateStatus(t, id, "delivered", signatureBase64 = signatureBase64, photoFile = photo) {
-                                deliveryViewModel.setProofPhoto(null) // Reset after success
+                    EcranSignature(
+                        modeleDeVue = deliveryViewModel,
+                        lorsSignatureCapturee = { signatureBase64 ->
+                            val photo = deliveryViewModel.photoPreuve.value
+                            deliveryViewModel.mettreAJourStatut(t, id, "delivered", fichierPhoto = photo, signatureBase64 = signatureBase64) {
+                                deliveryViewModel.definirPhotoPreuve(null)
                                 navController.navigate(Screen.Deliveries.route) {
                                     popUpTo(Screen.Deliveries.route) { inclusive = true }
                                 }
                             }
                         },
-                        onBack = { navController.popBackStack() }
+                        lorsRetour = { navController.popBackStack() }
                     )
                 }
             }
         }
         composable(Screen.DriverProfile.route) { backStackEntry ->
             val driverId = backStackEntry.arguments?.getString("driverId")?.toIntOrNull()
-            token?.let { t ->
+            jeton?.let { t ->
                 driverId?.let { id ->
-                    DriverProfileScreen(t, id, deliveryViewModel, onBack = {
+                    EcranProfilLivreur(t, id, deliveryViewModel, lorsRetour = {
                         navController.popBackStack()
                     })
                 }
             }
         }
         composable(Screen.Profile.route) {
-            ProfileScreen(authViewModel, onLogout = {
+            EcranProfil(authViewModel, lorsDeconnexion = {
                 navController.navigate(Screen.Login.route) {
                     popUpTo(0) { inclusive = true }
                 }
             })
         }
         composable(Screen.Suivi.route) {
-            val user by authViewModel.user.collectAsState()
-            token?.let {
-                SuiviScreen(it, user, deliveryViewModel, authViewModel)
+            val user by authViewModel.utilisateur.collectAsState()
+            jeton?.let {
+                EcranSuiviGlobal(it, user, deliveryViewModel, authViewModel)
             }
         }
     }

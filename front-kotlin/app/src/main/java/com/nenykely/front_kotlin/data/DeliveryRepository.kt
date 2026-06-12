@@ -17,6 +17,12 @@ class DeliveryRepository(context: Context? = null) {
 
     suspend fun login(email: String, password: String) = api.login(LoginRequest(email, password))
 
+    suspend fun resetPassword(email: String, motDePasse: String) = 
+        api.resetPassword(mapOf(
+            "email" to email,
+            "password" to motDePasse
+        ))
+
     suspend fun logout(token: String) = api.logout("Bearer $token")
 
     suspend fun me(token: String) = api.me("Bearer $token")

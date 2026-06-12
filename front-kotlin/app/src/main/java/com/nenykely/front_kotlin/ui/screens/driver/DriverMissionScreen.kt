@@ -44,123 +44,123 @@ import java.net.URL
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
-fun DriverMissionScreen(token: String, deliveryId: Int, viewModel: DeliveryViewModel, authViewModel: AuthViewModel, onBack: () -> Unit, onSignature: () -> Unit) {
-    val context = LocalContext.current
-    val delivery by viewModel.currentDelivery.collectAsState()
-    val isDarkMode by authViewModel.isDarkMode.collectAsState()
-    val error by viewModel.error.collectAsState()
-    val primaryBlue = MaterialTheme.colorScheme.primary
+fun EcranMissionLivreur(jeton: String, livraisonId: Int, modeleDeVue: DeliveryViewModel, modeleDeVueAuth: AuthViewModel, lorsRetour: () -> Unit, lorsSignature: () -> Unit) {
+    val contexte = LocalContext.current
+    val livraison by modeleDeVue.livraisonActuelle.collectAsState()
+    val estModeSombre by modeleDeVueAuth.estModeSombre.collectAsState()
+    val erreur by modeleDeVue.erreur.collectAsState()
+    val bleuPrimaire = MaterialTheme.colorScheme.primary
 
-    val locationPermissionState = rememberPermissionState(Manifest.permission.ACCESS_FINE_LOCATION)
+    val etatPermissionLocalisation = rememberPermissionState(Manifest.permission.ACCESS_FINE_LOCATION)
 
-    LaunchedEffect(error) {
-        error?.let {
-            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+    LaunchedEffect(erreur) {
+        erreur?.let {
+            Toast.makeText(contexte, it, Toast.LENGTH_LONG).show()
         }
     }
     
-    var currentLocation by remember { mutableStateOf<GeoPoint?>(null) }
-    var routePoints by remember { mutableStateOf<List<GeoPoint>>(emptyList()) }
-    var isFetchingRoute by remember { mutableStateOf(false) }
+    var localisationActuelle by remember { mutableStateOf<GeoPoint?>(null) }
+    var pointsItineraire by remember { mutableStateOf<List<GeoPoint>>(emptyList()) }
+    var chargementItineraire by remember { mutableStateOf(false) }
 
-    // REAL-TIME GPS TRACKING
-    val locationManager = remember { context.getSystemService(Context.LOCATION_SERVICE) as LocationManager }
-    val locationListener = remember {
-        LocationListener { location ->
-            val point = GeoPoint(location.latitude, location.longitude)
-            currentLocation = point
-            viewModel.updateLocation(token, location.latitude, location.longitude)
+    // SUIVI GPS EN TEMPS RÉEL
+    val gestionnaireLocalisation = remember { contexte.getSystemService(Context.LOCATION_SERVICE) as LocationManager }
+    val ecouteurLocalisation = remember {
+        LocationListener { localisation ->
+            val point = GeoPoint(localisation.latitude, localisation.longitude)
+            localisationActuelle = point
+            modeleDeVue.mettreAJourLocalisation(jeton, localisation.latitude, localisation.longitude)
         }
     }
 
-    LaunchedEffect(locationPermissionState.status) {
-        if (!locationPermissionState.status.isGranted) {
-            locationPermissionState.launchPermissionRequest()
+    LaunchedEffect(etatPermissionLocalisation.status) {
+        if (!etatPermissionLocalisation.status.isGranted) {
+            etatPermissionLocalisation.launchPermissionRequest()
         }
     }
 
-    DisposableEffect(locationPermissionState.status.isGranted) {
-        if (locationPermissionState.status.isGranted) {
+    DisposableEffect(etatPermissionLocalisation.status.isGranted) {
+        if (etatPermissionLocalisation.status.isGranted) {
             try {
-                locationManager.requestLocationUpdates(
+                gestionnaireLocalisation.requestLocationUpdates(
                     LocationManager.GPS_PROVIDER,
-                    5000L, // 5 seconds
-                    2f,    // 2 meters
-                    locationListener
+                    5000L, // 5 secondes
+                    2f,    // 2 mètres
+                    ecouteurLocalisation
                 )
             } catch (e: SecurityException) {
-                Log.e("GPS", "Permission error", e)
+                Log.e("GPS", "Erreur de permission", e)
             }
         }
         onDispose {
-            locationManager.removeUpdates(locationListener)
+            gestionnaireLocalisation.removeUpdates(ecouteurLocalisation)
         }
     }
 
-    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
-        if (bitmap != null) {
+    val lanceurCamera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { imageBitmap ->
+        if (imageBitmap != null) {
             try {
-                val file = File(context.cacheDir, "proof_${deliveryId}.jpg")
-                val out = FileOutputStream(file)
-                bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, out)
-                out.flush()
-                out.close()
-                viewModel.setProofPhoto(file)
-                Toast.makeText(context, "Photo de preuve enregistrée !", Toast.LENGTH_SHORT).show()
+                val fichier = File(contexte.cacheDir, "preuve_${livraisonId}.jpg")
+                val fluxSortie = FileOutputStream(fichier)
+                imageBitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, fluxSortie)
+                fluxSortie.flush()
+                fluxSortie.close()
+                modeleDeVue.definirPhotoPreuve(fichier)
+                Toast.makeText(contexte, "Photo de preuve enregistrée !", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
-                Log.e("Camera", "Error saving photo", e)
-                Toast.makeText(context, "Erreur lors de l'enregistrement de la photo", Toast.LENGTH_SHORT).show()
+                Log.e("Camera", "Erreur lors de l'enregistrement de la photo", e)
+                Toast.makeText(contexte, "Erreur lors de l'enregistrement de la photo", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
-    LaunchedEffect(deliveryId) {
-        viewModel.fetchTracking(token, deliveryId)
+    LaunchedEffect(livraisonId) {
+        modeleDeVue.recupererSuivi(jeton, livraisonId)
     }
 
-    val isPickedUp = delivery?.status != "assigned" && delivery?.status != "pending"
+    val estRecupere = livraison?.status != "assigned" && livraison?.status != "pending"
     
-    val targetLat = if (isPickedUp) delivery?.order?.recipient_lat else delivery?.order?.sender_lat
-    val targetLng = if (isPickedUp) delivery?.order?.recipient_lng else delivery?.order?.sender_lng
-    val targetName = if (isPickedUp) delivery?.order?.recipient_name else delivery?.order?.sender_name
-    val targetAddress = if (isPickedUp) delivery?.order?.recipient_address else delivery?.order?.sender_address
-    val targetLabel = if (isPickedUp) "Destinataire" else "Point de retrait"
+    val latitudeCible = if (estRecupere) livraison?.order?.recipient_lat else livraison?.order?.sender_lat
+    val longitudeCible = if (estRecupere) livraison?.order?.recipient_lng else livraison?.order?.sender_lng
+    val nomCible = if (estRecupere) livraison?.order?.recipient_name else livraison?.order?.sender_name
+    val adresseCible = if (estRecupere) livraison?.order?.recipient_address else livraison?.order?.sender_address
+    val libelleCible = if (estRecupere) "Destinataire" else "Point de retrait"
 
-    val destPoint = GeoPoint(targetLat ?: -18.8792, targetLng ?: 47.5079)
+    val pointDestination = GeoPoint(latitudeCible ?: -18.8792, longitudeCible ?: 47.5079)
 
-    LaunchedEffect(currentLocation, destPoint) {
-        currentLocation?.let { start ->
-            isFetchingRoute = true
+    LaunchedEffect(localisationActuelle, pointDestination) {
+        localisationActuelle?.let { depart ->
+            chargementItineraire = true
             try {
-                val url = "https://router.project-osrm.org/route/v1/driving/${start.longitude},${start.latitude};${destPoint.longitude},${destPoint.latitude}?overview=full&geometries=geojson"
-                val response = withContext(Dispatchers.IO) {
-                    val connection = URL(url).openConnection() as HttpURLConnection
-                    connection.setRequestProperty("User-Agent", "Mozilla/5.0")
-                    if (connection.responseCode == HttpURLConnection.HTTP_OK) {
-                        connection.inputStream.bufferedReader().readText()
+                val urlString = "https://router.project-osrm.org/route/v1/driving/${depart.longitude},${depart.latitude};${pointDestination.longitude},${pointDestination.latitude}?overview=full&geometries=geojson"
+                val reponse = withContext(Dispatchers.IO) {
+                    val connexion = URL(urlString).openConnection() as HttpURLConnection
+                    connexion.setRequestProperty("User-Agent", "Mozilla/5.0")
+                    if (connexion.responseCode == HttpURLConnection.HTTP_OK) {
+                        connexion.inputStream.bufferedReader().readText()
                     } else null
                 }
                 
-                response?.let {
+                reponse?.let {
                     val json = JSONObject(it)
                     if (json.getString("code") == "Ok") {
                         val routes = json.getJSONArray("routes")
                         if (routes.length() > 0) {
-                            val geometry = routes.getJSONObject(0).getJSONObject("geometry")
-                            val coords = geometry.getJSONArray("coordinates")
+                            val geometrie = routes.getJSONObject(0).getJSONObject("geometry")
+                            val coordonnees = geometrie.getJSONArray("coordinates")
                             val points = mutableListOf<GeoPoint>()
-                            for (i in 0 until coords.length()) {
-                                val coord = coords.getJSONArray(i)
+                            for (i in 0 until coordonnees.length()) {
+                                val coord = coordonnees.getJSONArray(i)
                                 points.add(GeoPoint(coord.getDouble(1), coord.getDouble(0)))
                             }
-                            routePoints = points
+                            pointsItineraire = points
                         }
                     }
                 }
             } catch (e: Exception) {
-                Log.e("Routing", "Error", e)
+                Log.e("Routing", "Erreur", e)
             } finally {
-                isFetchingRoute = false
+                chargementItineraire = false
             }
         }
     }
@@ -168,17 +168,17 @@ fun DriverMissionScreen(token: String, deliveryId: Int, viewModel: DeliveryViewM
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Mission #${delivery?.order?.id ?: ""}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
+                title = { Text("Mission #${livraison?.order?.id ?: ""}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = lorsRetour) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour", tint = MaterialTheme.colorScheme.onSurface)
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         }
-    ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+    ) { espacement ->
+        Box(modifier = Modifier.fillMaxSize().padding(espacement)) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
@@ -187,47 +187,47 @@ fun DriverMissionScreen(token: String, deliveryId: Int, viewModel: DeliveryViewM
                         setTileSource(TileSourceFactory.MAPNIK)
                         setMultiTouchControls(true)
                         controller.setZoom(14.0)
-                        controller.setCenter(currentLocation ?: destPoint)
+                        controller.setCenter(localisationActuelle ?: pointDestination)
                     }
                 },
-                update = { mapView ->
-                    if (isDarkMode) {
-                        mapView.overlayManager.tilesOverlay.setColorFilter(TilesOverlay.INVERT_COLORS)
+                update = { vueCarte ->
+                    if (estModeSombre) {
+                        vueCarte.overlayManager.tilesOverlay.setColorFilter(TilesOverlay.INVERT_COLORS)
                     } else {
-                        mapView.overlayManager.tilesOverlay.setColorFilter(null)
+                        vueCarte.overlayManager.tilesOverlay.setColorFilter(null)
                     }
 
-                    mapView.overlays.removeAll { it is Marker || it is Polyline }
+                    vueCarte.overlays.removeAll { it is Marker || it is Polyline }
                     
-                    val destMarker = Marker(mapView)
-                    destMarker.position = destPoint
-                    destMarker.title = "Destination"
-                    mapView.overlays.add(destMarker)
+                    val marqueurDestination = Marker(vueCarte)
+                    marqueurDestination.position = pointDestination
+                    marqueurDestination.title = "Destination"
+                    vueCarte.overlays.add(marqueurDestination)
 
-                    currentLocation?.let {
-                        val driverMarker = Marker(mapView)
-                        driverMarker.position = it
-                        driverMarker.title = "Ma position"
-                        driverMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                        mapView.overlays.add(driverMarker)
+                    localisationActuelle?.let {
+                        val marqueurLivreur = Marker(vueCarte)
+                        marqueurLivreur.position = it
+                        marqueurLivreur.title = "Ma position"
+                        marqueurLivreur.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                        vueCarte.overlays.add(marqueurLivreur)
                     }
 
-                    if (routePoints.isNotEmpty()) {
-                        val line = Polyline()
-                        line.setPoints(routePoints)
-                        line.outlinePaint.color = android.graphics.Color.BLUE
-                        line.outlinePaint.strokeWidth = 10f
-                        mapView.overlays.add(line)
+                    if (pointsItineraire.isNotEmpty()) {
+                        val ligne = Polyline()
+                        ligne.setPoints(pointsItineraire)
+                        ligne.outlinePaint.color = android.graphics.Color.BLUE
+                        ligne.outlinePaint.strokeWidth = 10f
+                        vueCarte.overlays.add(ligne)
                     }
-                    mapView.invalidate()
+                    vueCarte.invalidate()
                 }
             )
 
-            if (isFetchingRoute) {
+            if (chargementItineraire) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.TopCenter).padding(16.dp))
             }
 
-            // Mission Details Card
+            // Carte des détails de la mission
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -239,62 +239,62 @@ fun DriverMissionScreen(token: String, deliveryId: Int, viewModel: DeliveryViewM
                 border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
-                    Text(targetLabel, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(targetName ?: "Chargement...", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    Text(libelleCible, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(nomCible ?: "Chargement...", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                     
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 8.dp)) {
-                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = primaryBlue, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = bleuPrimaire, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(targetAddress ?: "", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(adresseCible ?: "", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
 
                     HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        val status = delivery?.status
+                        val statut = livraison?.status
                         
-                        if (status == "assigned") {
+                        if (statut == "assigned") {
                             Button(
                                 onClick = {
-                                    viewModel.updateStatus(token, deliveryId, "picked_up") {
-                                        Toast.makeText(context, "Colis récupéré !", Toast.LENGTH_SHORT).show()
+                                    modeleDeVue.mettreAJourStatut(jeton, livraisonId, "picked_up") {
+                                        Toast.makeText(contexte, "Colis récupéré !", Toast.LENGTH_SHORT).show()
                                     }
                                 },
                                 modifier = Modifier.weight(1f).height(50.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = primaryBlue),
+                                colors = ButtonDefaults.buttonColors(containerColor = bleuPrimaire),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
                                 Text("Récupérer le colis")
                             }
-                        } else if (status == "picked_up" || status == "in_transit") {
-                            val hasPhoto by viewModel.proofPhoto.collectAsState()
+                        } else if (statut == "picked_up" || statut == "in_transit") {
+                            val aUnePhoto by modeleDeVue.photoPreuve.collectAsState()
                             Column(modifier = Modifier.weight(1f)) {
                                 Button(
-                                    onClick = { cameraLauncher.launch(null) },
+                                    onClick = { lanceurCamera.launch(null) },
                                     modifier = Modifier.fillMaxWidth().height(45.dp),
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (hasPhoto != null) Color(0xFF059669) else Color.Gray
+                                        containerColor = if (aUnePhoto != null) Color(0xFF059669) else Color.Gray
                                     ),
                                     shape = RoundedCornerShape(12.dp)
                                 ) {
-                                    Icon(if (hasPhoto != null) Icons.Default.Check else Icons.Default.PhotoCamera, null)
+                                    Icon(if (aUnePhoto != null) Icons.Default.Check else Icons.Default.PhotoCamera, null)
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text(if (hasPhoto != null) "Photo prise" else "Preuve Photo")
+                                    Text(if (aUnePhoto != null) "Photo prise" else "Preuve Photo")
                                 }
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Button(
-                                    onClick = onSignature,
-                                    enabled = hasPhoto != null,
+                                    onClick = lorsSignature,
+                                    enabled = aUnePhoto != null,
                                     modifier = Modifier.fillMaxWidth().height(45.dp),
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (hasPhoto != null) Color(0xFF10B981) else Color.Gray
+                                        containerColor = if (aUnePhoto != null) Color(0xFF10B981) else Color.Gray
                                     ),
                                     shape = RoundedCornerShape(12.dp)
                                 ) {
                                     Text("Confirmer Livraison")
                                 }
                             }
-                        } else if (status == "delivered") {
+                        } else if (statut == "delivered") {
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 Surface(
                                     modifier = Modifier.fillMaxWidth().height(50.dp),
@@ -308,8 +308,8 @@ fun DriverMissionScreen(token: String, deliveryId: Int, viewModel: DeliveryViewM
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Button(
                                     onClick = {
-                                        val fileName = "Bon_Livraison_${delivery?.order?.order_number ?: deliveryId}.pdf"
-                                        viewModel.downloadReceipt(context, token, deliveryId, fileName)
+                                        val nomFichier = "Bon_Livraison_${livraison?.order?.order_number ?: livraisonId}.pdf"
+                                        modeleDeVue.telechargerRecu(contexte, jeton, livraisonId, nomFichier)
                                     },
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
