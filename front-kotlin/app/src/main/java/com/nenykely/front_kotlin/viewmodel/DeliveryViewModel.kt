@@ -48,19 +48,23 @@ class DeliveryViewModel(application: android.app.Application) : AndroidViewModel
     fun recupererLivraisons(jeton: String) {
         if (jeton.isBlank()) return
         viewModelScope.launch {
-            _estEnChargement.value = true
-            try {
-                val reponse = depot.getDeliveries(jeton)
-                if (reponse.isSuccessful) {
-                    _livraisons.value = reponse.body() ?: emptyList()
-                } else if (reponse.code() == 401) {
-                    _erreur.value = "Session expirée"
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("DeliveryViewModel", "Erreur de récupération : ${e.message}")
-            } finally {
-                _estEnChargement.value = false
+            chargerLivraisons(jeton)
+        }
+    }
+
+    private suspend fun chargerLivraisons(jeton: String) {
+        _estEnChargement.value = true
+        try {
+            val reponse = depot.getDeliveries(jeton)
+            if (reponse.isSuccessful) {
+                _livraisons.value = reponse.body() ?: emptyList()
+            } else if (reponse.code() == 401) {
+                _erreur.value = "Session expirée"
             }
+        } catch (e: Exception) {
+            android.util.Log.e("DeliveryViewModel", "Erreur de récupération : ${e.message}")
+        } finally {
+            _estEnChargement.value = false
         }
     }
 
@@ -113,7 +117,7 @@ class DeliveryViewModel(application: android.app.Application) : AndroidViewModel
                 )
                 val reponse = depot.storeDelivery(jeton, req)
                 if (reponse.isSuccessful) {
-                    recupererLivraisons(jeton)
+                    chargerLivraisons(jeton)
                     lorsResultat("Livraison enregistrée avec succès")
                 } else {
                     lorsResultat("Erreur lors de l'enregistrement : ${reponse.code()}")
@@ -128,16 +132,21 @@ class DeliveryViewModel(application: android.app.Application) : AndroidViewModel
 
     fun accepterLivraison(jeton: String, livraisonId: Int, lorsSucces: () -> Unit) {
         viewModelScope.launch {
+            _estEnChargement.value = true
             try {
                 val reponse = depot.acceptDelivery(jeton, livraisonId)
                 if (reponse.isSuccessful) {
-                    recupererLivraisons(jeton)
+                    chargerLivraisons(jeton)
                     lorsSucces()
                 } else {
                     if (reponse.code() == 401) _erreur.value = "Erreur d'authentification (401)"
+                    else _erreur.value = "Erreur ${reponse.code()} lors de l'acceptation"
                 }
             } catch (e: Exception) {
                 android.util.Log.e("DeliveryViewModel", "Erreur acceptation : ${e.message}")
+                _erreur.value = "Erreur de connexion"
+            } finally {
+                _estEnChargement.value = false
             }
         }
     }

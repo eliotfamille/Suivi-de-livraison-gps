@@ -18,7 +18,6 @@ class DeliveryController extends Controller
     public function index(Request $requete): JsonResponse
     {
         $utilisateur = $requete->user();
-
         $constructionRequete = Delivery::with(['order.package', 'driver.user', 'statuses']);
 
         // Si l'utilisateur est un client, il ne voit que ses commandes
@@ -29,14 +28,16 @@ class DeliveryController extends Controller
         }
         // Si c'est un livreur, il voit les missions disponibles (en attente) OU celles qui lui sont déjà assignées
         elseif ($utilisateur->hasRole('driver')) {
-            $constructionRequete->where(function($q) use ($utilisateur) {
+            $driverId = $utilisateur->driver->id ?? null;
+            Log::info("Index livraisons pour livreur ID: " . ($driverId ?? 'null'));
+
+            $constructionRequete->where(function($q) use ($driverId) {
                 $q->where('status', 'pending')
-                  ->orWhere('driver_id', $utilisateur->driver->id ?? null);
+                  ->orWhere('driver_id', $driverId);
             });
         }
 
         $livraisons = $constructionRequete->latest()->get();
-
         return response()->json($livraisons->map(fn($l) => $this->ressourceLivraison($l)));
     }
 
@@ -149,6 +150,8 @@ class DeliveryController extends Controller
      */
     public function accept(Request $requete, Delivery $livraison): JsonResponse
     {
+        Log::info("Acceptation livraison #{$livraison->id} par utilisateur ID: " . $requete->user()->id);
+
         if ($livraison->driver_id) {
             return response()->json(['message' => 'Cette mission est déjà assignée à un autre livreur.'], 422);
         }
@@ -158,19 +161,23 @@ class DeliveryController extends Controller
             return response()->json(['message' => 'Seuls les livreurs peuvent accepter des missions.'], 403);
         }
 
-        $livraison->update([
-            'driver_id'   => $livreur->id,
-            'status'      => 'assigned',
-            'assigned_at' => now(),
-        ]);
+        // Utilisation d'une transaction pour garantir la cohérence
+        DB::transaction(function() use ($livraison, $livreur, $requete) {
+            $livraison->update([
+                'driver_id'   => $livreur->id,
+                'status'      => 'assigned',
+                'assigned_at' => now(),
+            ]);
 
-        $livraison->statuses()->create([
-            'status' => 'assigned',
-            'label'  => 'Livreur assigné',
-            'note'   => 'La mission a été acceptée par ' . $requete->user()->name,
-        ]);
+            $livraison->statuses()->create([
+                'status' => 'assigned',
+                'label'  => 'Livreur assigné',
+                'note'   => 'La mission a été acceptée par ' . $requete->user()->name,
+                'occurred_at' => now(),
+            ]);
+        });
 
-        broadcast(new \App\Events\DeliveryStatusUpdated($livraison))->toOthers();
+        broadcast(new \App\Events\DeliveryStatusUpdated($livraison->load(['order.package', 'driver.user', 'statuses'])))->toOthers();
 
         return response()->json($this->ressourceLivraison($livraison));
     }

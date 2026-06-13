@@ -74,9 +74,9 @@ fun EcranLivraisonsLivreur(jeton: String, modeleDeVue: DeliveryViewModel, lorsCl
             }
 
             val livraisonsFiltrees = if (ongletSelectionne == 0) {
-                livraisons.filter { it.status == "pending" || it.status == "assigned" }
+                livraisons.filter { it.status == "pending" }
             } else {
-                livraisons.filter { it.status == "picked_up" || it.status == "in_transit" }
+                livraisons.filter { it.status == "assigned" || it.status == "picked_up" || it.status == "in_transit" }
             }
 
             if (estEnChargement && livraisonsFiltrees.isEmpty()) {

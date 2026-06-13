@@ -29,11 +29,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('deliveries')->group(function () {
         Route::get('/',                              [DeliveryController::class, 'index'])->middleware('role:client|admin|driver');
         Route::post('/',                             [DeliveryController::class, 'store'])->middleware('role:admin|client');
-        Route::get('/{delivery}',                   [DeliveryController::class, 'show'])->middleware('role:client|admin|driver');
-        Route::patch('/{delivery}/status',          [DeliveryController::class, 'updateStatus'])->middleware('role:driver|admin');
-        Route::post('/{delivery}/accept',           [DeliveryController::class, 'accept'])->middleware('role:driver');
-        Route::post('/{delivery}/rate',             [DeliveryController::class, 'rate'])->middleware('role:client');
-        Route::get('/{delivery}/receipt',            [DeliveryController::class, 'downloadReceipt']);
+        Route::get('/{livraison}',                   [DeliveryController::class, 'show'])->middleware('role:client|admin|driver');
+        Route::patch('/{livraison}/status',          [DeliveryController::class, 'updateStatus'])->middleware('role:driver|admin');
+        Route::post('/{livraison}/accept',           [DeliveryController::class, 'accept'])->middleware('role:driver');
+        Route::post('/{livraison}/rate',             [DeliveryController::class, 'rate'])->middleware('role:client');
+        Route::get('/{livraison}/receipt',            [DeliveryController::class, 'downloadReceipt']);
     });
 
     // Espace Livreur
